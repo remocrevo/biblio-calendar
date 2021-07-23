@@ -1,6 +1,6 @@
 <html>
 <head>
-	<title>KDL Monthly Calendar Generator</title>
+	<title>BiblioEvents Calendar Generator</title>
 </head>
 <body>
 
@@ -14,38 +14,98 @@
 
 
 <script>
-//BiblioCommons RSS parser
+//BiblioCommons BiblioEvents RSS parser
 //written by Remington Steed for Kent District Library, 2020
 //rsteed@kdl.org
 
-//FOR FAMILIES WITH CHILDREN
-//*Flix @ The Library*
-//Sundays, September 22, October 20 and November 17, 2:00 PM
-//*Fall Fest*
-//Tuesday, October 8, 10:00 AM
+//GOALS
+//- Provide a useful variety of ways to organize, limit and display upcoming events
 //
-//FOR ALL AGES
-//*Cascade Friends Fall Book Sale*
-//Saturday, September 14, 10:00 AM to 4:00 PM
-//Sunday, September 15, noon to 3:00 PM
+//CURRENT FEATURES
+//- Limit by month or season
+//- Limit by branch, or show all
+//- Show or Hide descriptions
+//- Group events by audience
+//- Combine events with the same title; show descriptions if they are different
 
 
+
+
+// ------------------------------------
+// ------------------------------------
+// ---          OPTIONS             ---
+// ------------------------------------
+// ------------------------------------
+
+
+//the URL of a BiblioEvents RSS feed
 RSS_URL = 'https://kdl.bibliocommons.com/events/rss/all';
 //ID of element where RSS HTML output will be added
 rss_block_element = 'events'
 
 
 
+//OPTIONS for DateTimeFormat. This affects the date and time display.
+//Choose which you want, and comment the others.
+locale = 'en-US';
+dt_options = {
+	weekday: 'long',	//'narrow', 'short', 'long'
+	//era: 'narrow',	//'narrow', 'short', 'long'
+	//year: '2-digit',	//'2-digit', 'numeric'
+	month: '2-digit',	//'2-digit', 'numeric', 'narrow', 'short', 'long'
+	day: 'numeric',		//'2-digit', 'numeric'
+	hour: 'numeric',	//'2-digit', 'numeric'
+	minute: '2-digit',	//'2-digit', 'numeric'
+	//second: '2-digit',	//'2-digit', 'numeric'
+	//timeZoneName: 'short',	//'short', 'long'
+};
+const DTF = new Intl.DateTimeFormat(locale, dt_options);
+//DTF.formatToParts() returns an array of this form:
+//- parts[0] is the first option from above
+//- parts[2] is the second
+//- parts[4] is the third
+//- parts[6] is the fourth
+
+
+
+
+
+// ------------------------
+// --- HELPER FUNCTIONS ---
+// ------------------------
+
+//redirect to URL with updated parameters
 function changeParam(param, value) {
 	new_params = new URL(window.location.href).searchParams;
 	new_params.set(param, value);
 	window.location.search = new_params.toString();
 }
 
+//increment only the month of the date
+//- if date doesn't exist in new month (e.g. Feb 30), set to last day of the month
+function addMonths(date, months) {
+    var d = date.getDate();
+    date.setMonth(date.getMonth() + +months);
+    if (date.getDate() != d) {
+      date.setDate(0);
+    }
+    return date;
+}
+
+
+
+
+
+
+
 //parse URL parameters
 var url_params = new URL(window.location.href).searchParams;
 
 
+
+// ------------------------------
+// --- CREATE MONTHS DROPDOWN ---
+// ------------------------------
 
 //AP Style calls for the following months to be abbreviated: Jan., Feb., Aug., Sept., Oct., Nov. and Dec.
 const months = [
@@ -63,8 +123,6 @@ const months = [
 	{AP: 'Dec.', full: 'December'}
 ];
 
-
-//create months dropdown
 //start with current month, 12 months total
 today = new Date();
 year_choice = today.getFullYear();
@@ -125,7 +183,12 @@ select_html += '</select>';
 document.getElementById('month_selector').insertAdjacentHTML('afterbegin', select_html);
 
 
-//dropdown for branches
+// ------------------------------
+// --- CREATE BRANCH DROPDOWN ---
+// ------------------------------
+
+//Branches exactly as they appear in the RSS feed, HTML escaped
+//TODO: fetch these via an API
 const branch_choices = {
 	'ALL': '- ALL BRANCHES -',
 	'ONLINE': 'Online',
@@ -156,9 +219,6 @@ var filter_location_code = url_params.get("branch");
 filter_location_code = filter_location_code ? filter_location_code : 'ALL';
 filter_location_name = branch_choices[filter_location_code];
 
-//param for hiding descriptions
-var hide_descriptions = url_params.get("hide_descriptions");
-
 
 //dropdown for all of this year
 select_html = '<select name="branch" onchange="changeParam(\'branch\', this.value)">';
@@ -170,35 +230,17 @@ select_html += '</select>';
 
 document.getElementById('branch_selector').insertAdjacentHTML('afterbegin', select_html);
 
-//checkbox for hiding descriptions
+
+// -----------------------------------
+// --- CREATE DESCRIPTION CHECKBOX ---
+// -----------------------------------
+
+//param for hiding descriptions
+var hide_descriptions = url_params.get("hide_descriptions");
+
 checked = (hide_descriptions === 'true') ? ' checked' : '';
 checkbox_html = '<label for="hide_descriptions">Hide descriptions</label> <input' + checked + ' type="checkbox" id="hide_descriptions" name="hide_descriptions"  onChange="changeParam(\'hide_descriptions\', this.checked)" />';
 document.getElementById('hide_descriptions_span').insertAdjacentHTML('afterbegin', checkbox_html);
-
-
-
-let html = ``;
-total = 0;
-//only display this many items
-total_to_display = 500; //just a sanity check
-
-//TODO: FILTER BY BRANCH
-//- by branch
-//- by date ranges (week: Monday date + 6 days; full month)
-//TODO: consider hiding Type: Outreach...
-//<category domain="Type">Outreach-School Partnership</category>
-
-
-
-
-function addMonths(date, months) {
-    var d = date.getDate();
-    date.setMonth(date.getMonth() + +months);
-    if (date.getDate() != d) {
-      date.setDate(0);
-    }
-    return date;
-}
 
 
 
@@ -226,26 +268,15 @@ if (typeof chosen_date === 'undefined') {
 //note: cloning the chosen date to be safe
 const filter_end_date = addMonths(new Date(filter_start_date.getTime()), month_range);
 
-//OPTIONS for DateTimeFormat. Choose which you want, and comment the others.
-locale = 'en-US';
-dt_options = {
-	weekday: 'long',	//'narrow', 'short', 'long'
-	//era: 'narrow',	//'narrow', 'short', 'long'
-	//year: '2-digit',	//'2-digit', 'numeric'
-	month: '2-digit',	//'2-digit', 'numeric', 'narrow', 'short', 'long'
-	day: 'numeric',		//'2-digit', 'numeric'
-	hour: 'numeric',	//'2-digit', 'numeric'
-	minute: '2-digit',	//'2-digit', 'numeric'
-	//second: '2-digit',	//'2-digit', 'numeric'
-	//timeZoneName: 'short',	//'short', 'long'
-};
-const DTF = new Intl.DateTimeFormat(locale, dt_options);
-//DTF.formatToParts() returns an array of this form:
-//- parts[0] is the first option from above
-//- parts[2] is the second
-//- parts[4] is the third
-//- parts[6] is the fourth
 
+
+
+
+
+let html = ``;
+total = 0;
+//only display this many items
+total_to_display = 500; //just a sanity check
 
 
 let event_blocks = new Array();
@@ -272,6 +303,7 @@ fetch(RSS_URL)
 	  event_end_datetime = new Date(end_date);
 	  let duration = event_end_datetime - event_start_datetime;
 	  let duration_hours = (duration / (1000 * 60 * 60)).toFixed(1);
+	  
 	  //use the DateTimeFormat object we defined above
       const dt_start = DTF.formatToParts(event_start_datetime);
 	  const dt_end = DTF.formatToParts(event_end_datetime);
@@ -279,6 +311,9 @@ fetch(RSS_URL)
 	  day_of_week = dt_start[0].value;
 	  month = months[parseInt(dt_start[2].value)-1].AP; //formatted for AP style
 	  day_num = dt_start[4].value;
+
+	  //create datetime output strings
+	  //build the HTML output using template strings, such as `${el.querySelector('title').innerHTML}`
 	  start_time = `${dt_start[6].value}:${dt_start[8].value} ${dt_start[10].value}`;
 	  end_time = `${dt_end[6].value}:${dt_end[8].value} ${dt_end[10].value}`;
 	  
@@ -314,7 +349,8 @@ fetch(RSS_URL)
 		  time_str = (duration_hours === '1.0') ? `${start_time}` : `${start_time} to ${end_time}`;
 
 		  
-		  //show "Registration required" symbol? <bc:registration_info><bc:is_required>true
+		  //show "Registration required"
+		  //In RSS: <bc:registration_info><bc:is_required>true
 		  reg_el = el.querySelector('registration_info');
 		  reg_required_str = reg_el.firstElementChild.innerHTML == 'true' ? 'Registration required' : '';
 		  
