@@ -19,7 +19,7 @@
 //rsteed@kdl.org
 
 //GOALS
-//- Provide a useful variety of ways to organize, limit and display upcoming events
+//- Provide a variety of ways to organize, limit and display upcoming events
 //
 //CURRENT FEATURES
 //- Limit by month or season
@@ -133,6 +133,7 @@ this_month_YMD = date.toISOString().split("T")[0]; //date as YYYY-MM-DD
 var month_param = url_params.get("month") || this_month_YMD;
 chosen_date = month_param;
 console.log('chosen_date: ', chosen_date);
+//check if chosen_month is a season, like "fall_2021"
 month_pieces = chosen_date.split('_');
 season = month_pieces[0];
 season_year = month_pieces[1];
@@ -162,6 +163,7 @@ if (month_choice >= 3 && month_choice <= 5) { //Mar-May, Spring
 } else { //Dec-Feb, Winter
 	select_html += winter + spring2;
 }
+//add a divider
 select_html += '<option disabled>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</option>';
 for (var i = 0; i < 12; i++) {
 	date = new Date(year_choice, month_choice, 1); //first of the month
