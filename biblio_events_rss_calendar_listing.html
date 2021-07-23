@@ -345,6 +345,9 @@ fetch(RSS_URL)
 				`]
 			  }
 		  } else {
+			if (event_blocks[location_name][ages_str][title].description !== description) {
+				event_blocks[location_name][ages_str][title].description += `<div>${month} ${day_num}: ${description}</div>`;
+			}
 			event_blocks[location_name][ages_str][title].dates.push(`
 	<div>${day_of_week}, ${month} ${day_num}, ${time_str}</div>
 			`);
