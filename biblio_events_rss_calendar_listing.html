@@ -193,6 +193,7 @@ document.getElementById('month_selector').insertAdjacentHTML('afterbegin', selec
 //TODO: fetch these via an API
 const branch_choices = {
 	'ALL': '- ALL BRANCHES -',
+	'NON': '- NON-BRANCH LOCATIONS -',
 	'ONLINE': 'Online',
 	'ALP': 'Alpine Township Branch',
 	'ALT': 'Alto Branch',
@@ -323,17 +324,24 @@ fetch(RSS_URL)
 	  //TODO: need a better way of getting the BiblioCommons location name;
 	  //- 'location name' doesn't work, maybe because of the 'bc:' namespaces;
 	  //- using 'firstElementChild' for now
+	  
 	  //blank location means 'Online'
 	  location_name = location_el ? location_el.firstElementChild.innerHTML : 'Online';
-	  //exclude non-branch locations
-	  var is_a_branch = Object.values(branch_choices).includes(location_name);
+	  
+	  //handle non-branch locations
+	  nonbranch_location_name = '';
+	  if (!Object.values(branch_choices).includes(location_name)) {
+		nonbranch_location_name = location_name;
+		location_name = ' Non-Branch Locations';
+	  }
 
       //FILTER
 	  //- by branch
 	  //- by date ranges (week: Monday date + 6 days; full month)
 	  if (
-		(location_name === filter_location_name ||
-			(filter_location_code === 'ALL' && is_a_branch)
+		(location_name === filter_location_name
+			|| filter_location_code === 'ALL'
+			|| (filter_location_code === 'NON' && nonbranch_location_name !== '') //is a non-branch location
 		)
 		&& (event_start_datetime > filter_start_date)
 		&& (event_start_datetime < filter_end_date)
@@ -374,6 +382,7 @@ fetch(RSS_URL)
 		  if (typeof event_blocks[location_name][ages_str][title] === 'undefined') {
 			  event_blocks[location_name][ages_str][title] = {
 				'location': location_name,
+				'nonbranch_location': nonbranch_location_name,
 				'ages_str': ages_str,
 				'title': title,
 				'description': description,
@@ -418,6 +427,7 @@ fetch(RSS_URL)
 					<p style="margin-top:1em">
 						<div><strong>${event.title}</strong></div>
 					` + event.dates.join('') + `
+					` + (event.nonbranch_location==='' ? '' : `<div><b>Location:</b> ${event.nonbranch_location}</div>`) + `
 					` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
 						<div>${event.reg_required_str}</div>
 					</p>
