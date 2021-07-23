@@ -40,8 +40,6 @@
 
 //the URL of a BiblioEvents RSS feed
 RSS_URL = 'https://kdl.bibliocommons.com/events/rss/all';
-//ID of element where RSS HTML output will be added
-rss_block_element = 'events'
 
 
 
@@ -424,7 +422,7 @@ fetch(RSS_URL)
 		}
 	}
 
-	document.getElementById(rss_block_element).insertAdjacentHTML('afterbegin', html);
+	document.getElementById('events').insertAdjacentHTML('afterbegin', html);
   });
 </script>
 
