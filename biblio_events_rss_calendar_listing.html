@@ -263,8 +263,9 @@ if (typeof chosen_date === 'undefined') {
 	//first day of next month
 	filter_start_date = new Date(today.getFullYear(), next_month.getMonth(), 1);
 } else {
-	//TODO: '-05' will make summer dates set to 1am, but that usually doesn't matter
-	filter_start_date = new Date(chosen_date + 'T00:00:00-05:00'); //EDT
+	chosen_date_pieces = chosen_date.split('-');
+	//use "chosen_date_pieces[1] - 1" since month is zero-indexed, so 0 = Jan
+	filter_start_date = new Date(chosen_date_pieces[0], chosen_date_pieces[1] - 1, chosen_date_pieces[2]); //defaults to local time, not GMT
 }
 
 //first day of the month after chosen month, or 3 months after if season
