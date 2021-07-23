@@ -359,7 +359,7 @@ fetch(RSS_URL)
 		  if (total > total_to_display) return true; //stop the loop
 		  
 		  link = el.querySelector('link').innerHTML;
-		  title = el.querySelector("title").innerHTML;
+		  title = el.querySelector("title").innerHTML.trim();
 		  description = el.querySelector("description").innerHTML;
 		  //remove CDATA tags
 		  description = description.replace("<![CDATA[", "").replace("]]>", "");
