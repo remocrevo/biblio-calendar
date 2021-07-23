@@ -48,6 +48,37 @@ RSS_URL = 'https://' + library_id + '.bibliocommons.com/events/rss/all';
 
 
 
+//Branches exactly as they appear in the RSS feed, HTML escaped
+//TODO: fetch these via an API
+const branch_choices = {
+	'ALL': '- ALL BRANCHES -',
+	'NON': '- NON-BRANCH LOCATIONS -',
+	'ONLINE': 'Online',
+	'ALP': 'Alpine Township Branch',
+	'ALT': 'Alto Branch',
+	'ADA': 'Amy Van Andel Library (Ada)',
+	'BYR': 'Byron Township Branch',
+	'CAS': 'Cascade Township Branch',
+	'CAL': 'Caledonia Township Branch',
+	'COM': 'Comstock Park Branch',
+	'EGR': 'East Grand Rapids Branch',
+	'LOW': 'Englehardt (Lowell) Branch',
+	'GNS': 'Gaines Township Branch',
+	'GDV': 'Grandville Branch',
+	'KEL': 'Kelloggsville Branch',
+	'KWD': 'Kentwood (Richard L. Root) Branch',
+	'ROC': 'Krause Memorial (Rockford) Branch',
+	'NEL': 'Nelson Township Branch',
+	'PFD': 'Plainfield Township Branch',
+	'SPE': 'Spencer Township Branch',
+	'TYR': 'Tyrone Township Branch',
+	'WAL': 'Walker Branch',
+	'WYO': 'Wyoming Branch and KDL Talking Book &amp; Braille Center'
+};
+
+
+
+
 //OPTIONS for DateTimeFormat. This affects the date and time display.
 //Choose which you want, and comment the others.
 locale = 'en-US';
@@ -191,34 +222,6 @@ document.getElementById('month_selector').insertAdjacentHTML('afterbegin', selec
 // ------------------------------
 // --- CREATE BRANCH DROPDOWN ---
 // ------------------------------
-
-//Branches exactly as they appear in the RSS feed, HTML escaped
-//TODO: fetch these via an API
-const branch_choices = {
-	'ALL': '- ALL BRANCHES -',
-	'NON': '- NON-BRANCH LOCATIONS -',
-	'ONLINE': 'Online',
-	'ALP': 'Alpine Township Branch',
-	'ALT': 'Alto Branch',
-	'ADA': 'Amy Van Andel Library (Ada)',
-	'BYR': 'Byron Township Branch',
-	'CAS': 'Cascade Township Branch',
-	'CAL': 'Caledonia Township Branch',
-	'COM': 'Comstock Park Branch',
-	'EGR': 'East Grand Rapids Branch',
-	'LOW': 'Englehardt (Lowell) Branch',
-	'GNS': 'Gaines Township Branch',
-	'GDV': 'Grandville Branch',
-	'KEL': 'Kelloggsville Branch',
-	'KWD': 'Kentwood (Richard L. Root) Branch',
-	'ROC': 'Krause Memorial (Rockford) Branch',
-	'NEL': 'Nelson Township Branch',
-	'PFD': 'Plainfield Township Branch',
-	'SPE': 'Spencer Township Branch',
-	'TYR': 'Tyrone Township Branch',
-	'WAL': 'Walker Branch',
-	'WYO': 'Wyoming Branch and KDL Talking Book &amp; Braille Center'
-};
 
 var filter_location_code = url_params.get("branch");
 //default to 'ALL'
