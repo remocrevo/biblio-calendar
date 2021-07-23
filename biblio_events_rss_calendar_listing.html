@@ -350,7 +350,7 @@ fetch(RSS_URL)
 		  //show "Registration required"
 		  //In RSS: <bc:registration_info><bc:is_required>true
 		  reg_el = el.querySelector('registration_info');
-		  reg_required_str = reg_el.firstElementChild.innerHTML == 'true' ? 'Registration required' : '';
+		  reg_required_str = reg_el.firstElementChild.innerHTML == 'true' ? '<b>Registration required</b>' : '';
 		  
 		  //collect ages/audiences
 		  ages_nodes = el.querySelectorAll('category[domain="Audience"]');
@@ -415,7 +415,7 @@ fetch(RSS_URL)
 						<div><strong>${event.title}</strong></div>
 					` + event.dates.join('') + `
 					` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
-						<div><b>${event.reg_required_str}</b></div>
+						<div>${event.reg_required_str}</div>
 					</p>
 				`;
 			}
