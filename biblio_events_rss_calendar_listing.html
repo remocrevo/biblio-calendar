@@ -6,6 +6,10 @@
 </head>
 <body>
 
+<p>CAVEATS<ul>
+<li>This pulls from the BiblioEvents RSS feed, which only includes the next 6 months or 2000 events, whichever is achieved first. (<a href="https://partnerportal.bibliocommons.com/hc/en-us/articles/205053354">see Partner Portal</a>)</li>
+<li>The RSS feed refreshes every 30 minutes or so (current timestamp is <strong id="lastBuildDate"></strong>)</li>
+</ul></p>
 
 <span id="month_selector"></span>
 <span id="branch_selector"></span>
@@ -298,6 +302,12 @@ fetch(RSS_URL)
   .then(str => new window.DOMParser().parseFromString(str, 'text/xml'))
   .then(data => {
 
+	// the lastBuildDate field seems to be behind by 12 hours, or wrongly showing 12-hour format in 24-hour format (without am/pm)
+	lastBuildDate_el = data.querySelector('lastBuildDate');
+//	lastBuildDate = new Date(lastBuildDate_el.innerHTML);
+	lastBuildDate = lastBuildDate_el.innerHTML;
+	document.getElementById('lastBuildDate').insertAdjacentHTML('afterbegin', lastBuildDate);
+	
     items = data.querySelectorAll('item');
 	items = Array.from(items); //convert NodeList to Array
 	
