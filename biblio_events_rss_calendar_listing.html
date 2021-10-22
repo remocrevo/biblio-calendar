@@ -20,21 +20,30 @@
 
 
 <script>
-//BiblioCommons BiblioEvents RSS parser
-//written by Remington Steed for Kent District Library, 2020
-//rsteed@kdl.org
+/*
+BiblioCommons BiblioEvents RSS parser
+written by Remington Steed for Kent District Library, 2020
+rsteed@kdl.org
 
-//GOALS
-//- Provide a variety of ways to organize, limit and display upcoming events
-//
-//CURRENT FEATURES
-//- Limit by month or season
-//- Limit by branch, or show all
-//- Show or Hide descriptions
-//- Group events by audience
-//- Combine events with the same title; show descriptions if they are different
+GOALS
+- Provide a variety of ways to organize, limit and display upcoming events
 
-
+CURRENT FEATURES
+- Limit by month or season
+- Limit by branch, or show all
+- Show or Hide descriptions
+- Group events by audience
+- Combine events with the same title; show descriptions if they are different
+- Summarize multiple dates into a range:
+	- currently supports 3+ weekly events:
+		Tuesday, Oct. 19, 10:00 AM to 10:30 AM
+		Tuesday, Oct. 26, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 2, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 9, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 16, 10:00 AM to 10:30 AM
+		becomes:
+		Tuesday, Oct. 19 - Nov. 16
+*/
 
 
 // ------------------------------------
@@ -407,7 +416,8 @@ fetch(RSS_URL)
 				'reg_required_str': reg_required_str,
 				'dates': [`
 		<div>${day_of_week}, ${month} ${day_num}, ${time_str}</div>
-				`]
+				`],
+				'date_objects': [event_start_datetime]
 			  }
 		  } else {
 			if (event_blocks[location_name][ages_str][title].description !== description) {
@@ -416,6 +426,7 @@ fetch(RSS_URL)
 			event_blocks[location_name][ages_str][title].dates.push(`
 	<div>${day_of_week}, ${month} ${day_num}, ${time_str}</div>
 			`);
+			event_blocks[location_name][ages_str][title].date_objects.push(event_start_datetime);
 		  }
 
 		}; //end of filter check
@@ -441,9 +452,45 @@ fetch(RSS_URL)
 			`;
 			for (const [event_key, event] of Object.entries(age_group)) {
 				//build event output with all dates joined in the correct place
+				//- summarize multiple dates into a range:
+				var temp_date = event.date_objects[0];
+
+				//use our DateTimeFormat object
+				const dt_temp = DTF.formatToParts(temp_date);
+				first_month = months[parseInt(dt_temp[2].value)-1].AP; //formatted for AP style
+				first_day_num = dt_temp[4].value;
+	  
+				var date_range_str = '';
+				temp_end_date = '';
+				range_closed = 0;
+				for (var i = 1; i < event.date_objects.length; i++) {
+					temp_date.setDate(temp_date.getDate() + 7);
+					if ((range_closed==0) && (event.date_objects[i].getTime() == temp_date.getTime())) {
+						temp_end_date = event.date_objects[i];
+					} else {
+						range_closed = 1;
+						break;
+					}
+				}
+				//only make range if more than 2 events (i>2) OR if all events are in range
+				if (i>2 && 
+					(range_closed == 1 || 
+						(i == event.date_objects.length
+						&& temp_end_date!='')
+					)
+				) {
+					//use our DateTimeFormat object
+					const dt_temp_end = DTF.formatToParts(temp_end_date);
+					month = months[parseInt(dt_temp_end[2].value)-1].AP; //formatted for AP style
+					day_num = dt_temp_end[4].value;
+
+					date_range_str = `${first_month} ${first_day_num} - ${month} ${day_num}`;
+				}
+				
 				html += `
 					<p style="margin-top:1em">
 						<div><strong>${event.title}</strong></div>
+					` + (date_range_str!='' ? `<div><i>Attempted Date Range: ${date_range_str}</i></div>` : '') + `
 					` + event.dates.join('') + `
 					` + (event.nonbranch_location==='' ? '' : `<div><b>Location:</b> ${event.nonbranch_location}</div>`) + `
 					` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
