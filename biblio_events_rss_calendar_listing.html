@@ -197,7 +197,7 @@ selected = (season == 'summer') ? ' selected="selected"' : '';
 summer = '<option' + selected + ' value="summer_' + year_choice + '">Summer ' + year_choice + '</option>';
 selected = (season == 'fall') ? ' selected="selected"' : '';
 fall = '<option' + selected + ' value="fall_' + year_choice + '">Fall ' + year_choice + '</option>';
-year1 = (year_choice == 12) ? year_choice : year_choice-1;
+year1 = year_choice;
 year2 = year1 + 1;
 selected = (season == 'winter') ? ' selected="selected"' : '';
 winter = '<option' + selected + ' value="winter_' + year1 + '">Winter ' + year1 + '-' + year2 + '</option>';
