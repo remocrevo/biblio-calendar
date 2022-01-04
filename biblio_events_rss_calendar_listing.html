@@ -480,7 +480,8 @@ fetch(RSS_URL)
 			`;
 			for (const [event_key, event] of Object.entries(age_group)) {
 				//build event output with all dates joined in the correct place
-				//- summarize multiple dates into a range:
+				//- summarize multiple dates into a range
+				//TODO: remove date from array as pattern is found, so we can repeat the process with a new first date; e.g. first find "Mondays", then find "Wednesdays", etc.
 				var temp_date = event.date_objects[0];
 
 				//use our DateTimeFormat object
@@ -511,14 +512,16 @@ fetch(RSS_URL)
 					const dt_temp_end = DTF.formatToParts(temp_end_date);
 					month = months[parseInt(dt_temp_end[2].value)-1].AP; //formatted for AP style
 					day_num = dt_temp_end[4].value;
+					day_of_week = dt_temp_end[0].value;
+					start_time = `${dt_temp_end[6].value}:${dt_temp_end[8].value} ${dt_temp_end[10].value}`;
 
-					date_range_str = `${first_month} ${first_day_num} - ${month} ${day_num}`;
+					date_range_str = `${day_of_week}s, ${first_month} ${first_day_num} - ${month} ${day_num}, ${start_time}`;
 				}
 				
 				html += `
 					<p style="margin-top:1em">
 						<div><strong>${event.title}</strong></div>
-					` + (date_range_str!='' ? `<div><i>Attempted Date Range: ${date_range_str}</i></div>` : '') + `
+					` + (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') + `
 					` + event.dates.join('') + `
 					` + (event.nonbranch_location==='' ? '' : `<div><b>Location:</b> ${event.nonbranch_location}</div>`) + `
 					` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
