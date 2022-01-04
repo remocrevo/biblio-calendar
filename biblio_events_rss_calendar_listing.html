@@ -90,6 +90,18 @@ const branch_choices = {
 };
 
 
+//sort order of age groups
+age_groups_in_order = [
+	'All Ages',
+	'Young Children (ages 0-5)',
+	'School Age (ages 5-10)',
+	'Teens (ages 11-17)',
+	'Adults (18+)',
+];
+
+var age_groups_index = {}; // map for efficient lookup of sortIndex
+for (var i=0; i < age_groups_in_order.length; i++)
+    age_groups_index[age_groups_in_order[i]] = i;
 
 
 //OPTIONS for DateTimeFormat. This affects the date and time display.
@@ -446,7 +458,23 @@ fetch(RSS_URL)
 		html += `
 		<h1>${location_key}</h1>
 		`;
-		for (const [age_key, age_group] of Object.entries(location_name)) {
+		//sort this location's age groups in custom order
+		const age_groups_ordered = Object.keys(location_name).sort(
+			function(a, b) {
+				//only consider first age group in multi-group string (strip comma and after)
+				a = (a.indexOf(",") > -1) ? a.substring(0, a.indexOf(",")) : a;
+				b = (b.indexOf(",") > -1) ? b.substring(0, b.indexOf(",")) : b;
+				return (age_groups_index[a] - age_groups_index[b]) || a.localeCompare(b);
+			}
+		).reduce(
+		  (obj, key) => { 
+			obj[key] = location_name[key]; 
+			return obj;
+		  }, 
+		  {}
+		);
+		
+		for (const [age_key, age_group] of Object.entries(age_groups_ordered)) {
 			html += `
 			<h3>For ${age_key}</h3>
 			`;
