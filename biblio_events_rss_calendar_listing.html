@@ -200,30 +200,36 @@ month_pieces = chosen_date.split('_');
 season = month_pieces[0];
 season_year = month_pieces[1];
 
+
+year1 = year_choice;
+year2 = year1 + 1;
+year0 = year1 - 1;
+
 //dropdown for all of this year
 select_html = '<select name="month" onchange="changeParam(\'month\', this.value)"><option value="">- choose a date range -</option>';
 //prep season options
 selected = (season == 'spring') ? ' selected="selected"' : '';
-spring1 = '<option' + selected + ' value="spring_' + year_choice + '">Spring ' + year_choice + '</option>';
-spring2 = '<option' + selected + ' value="spring_' + (year_choice+1) + '">Spring ' + (year_choice+1) + '</option>';
+spring_thisyear = '<option' + selected + ' value="spring_' + year_choice + '">Spring ' + year_choice + '</option>';
+spring_nextyear = '<option' + selected + ' value="spring_' + year2 + '">Spring ' + year2 + '</option>';
 selected = (season == 'summer') ? ' selected="selected"' : '';
 summer = '<option' + selected + ' value="summer_' + year_choice + '">Summer ' + year_choice + '</option>';
 selected = (season == 'fall') ? ' selected="selected"' : '';
 fall = '<option' + selected + ' value="fall_' + year_choice + '">Fall ' + year_choice + '</option>';
-year1 = year_choice;
-year2 = year1 + 1;
 selected = (season == 'winter') ? ' selected="selected"' : '';
-winter = '<option' + selected + ' value="winter_' + year1 + '">Winter ' + year1 + '-' + year2 + '</option>';
+winter_started_lastyear = '<option' + selected + ' value="winter_' + year0 + '">Winter ' + year0 + '-' + year1 + '</option>';
+winter_started_thisyear = '<option' + selected + ' value="winter_' + year1 + '">Winter ' + year1 + '-' + year2 + '</option>';
 
-//display two season based on today's date
-if (month_choice >= 3 && month_choice <= 5) { //Mar-May, Spring
+//display two seasons based on today's date
+if (month_choice >= 0 && month_choice <= 1) { //Jan-Feb, Winter
+	select_html += winter_started_lastyear + spring_thisyear;
+} else if (month_choice >= 2 && month_choice <= 4) { //Mar-May, Spring
 	select_html += spring1 + summer;
-} else if (month_choice >= 6 && month_choice <= 8) { //Jun-Aug, Summer
+} else if (month_choice >= 5 && month_choice <= 7) { //Jun-Aug, Summer
 	select_html += summer + fall;
-} else if (month_choice >= 9 && month_choice <= 11) { //Sep-Nov, Fall
+} else if (month_choice >= 8 && month_choice <= 10) { //Sep-Nov, Fall
 	select_html += fall + winter;
-} else { //Dec-Feb, Winter
-	select_html += winter + spring2;
+} else { //Dec, Winter
+	select_html += winter_started_thisyear + spring_nextyear;
 }
 //add a divider
 select_html += '<option disabled>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</option>';
