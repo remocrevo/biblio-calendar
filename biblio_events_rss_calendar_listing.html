@@ -345,6 +345,9 @@ fetch(RSS_URL)
 
 	//'some' will iterate until we return true; not available on NodeList
     items.some(el => {
+	  //is this event cancelled?
+	  is_cancelled = el.querySelector('is_cancelled').innerHTML; //"true" or "false"
+
 	  //break date strings into the pieces we need
 	  start_date = el.querySelector('start_date').innerHTML;
 	  end_date = el.querySelector('end_date').innerHTML;
@@ -436,6 +439,7 @@ fetch(RSS_URL)
 				'title': title,
 				'description': description,
 				'reg_required_str': reg_required_str,
+				'cancelled': (is_cancelled === 'true' ? '[CANCELLED]' : ''),
 				'dates': [`
 		<div>${day_of_week}, ${month} ${day_num}, ${time_str}</div>
 				`],
@@ -530,7 +534,7 @@ fetch(RSS_URL)
 				
 				html += `
 					<p style="margin-top:1em">
-						<div><strong>${event.title}</strong></div>
+						<div>${event.cancelled} <strong>${event.title}</strong></div>
 					` + (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') + `
 					` + event.dates.join('') + `
 					` + (event.nonbranch_location==='' ? '' : `<div><b>Location:</b> ${event.nonbranch_location}</div>`) + `
