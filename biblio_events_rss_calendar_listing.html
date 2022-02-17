@@ -339,6 +339,7 @@ fetch(RSS_URL)
     items = data.querySelectorAll('item');
 	items = Array.from(items); //convert NodeList to Array
 	
+    const all_titles = new Set(); //collect unique list of program titles
 
 //LOOP THROUGH THE RSS FEED
 
@@ -398,6 +399,8 @@ fetch(RSS_URL)
 		  
 		  link = el.querySelector('link').innerHTML;
 		  title = el.querySelector("title").innerHTML.trim();
+		  all_titles.add(title);
+		  
 		  description = el.querySelector("description").innerHTML;
 		  //remove CDATA tags
 		  description = description.replace("<![CDATA[", "").replace("]]>", "");
@@ -538,6 +541,9 @@ fetch(RSS_URL)
 			}
 		}
 	}
+	
+	//print sorted list of titles
+	html = html + '<h3>All Events in This Timeframe</h3>' + [...all_titles].sort().join('<br>');
 
 	document.getElementById('events').insertAdjacentHTML('afterbegin', html);
   });
