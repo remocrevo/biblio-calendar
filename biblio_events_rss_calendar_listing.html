@@ -223,7 +223,7 @@ winter_started_thisyear = '<option' + selected + ' value="winter_' + year1 + '">
 if (month_choice >= 0 && month_choice <= 1) { //Jan-Feb, Winter
 	select_html += winter_started_lastyear + spring_thisyear;
 } else if (month_choice >= 2 && month_choice <= 4) { //Mar-May, Spring
-	select_html += spring1 + summer;
+	select_html += spring_thisyear + summer;
 } else if (month_choice >= 5 && month_choice <= 7) { //Jun-Aug, Summer
 	select_html += summer + fall;
 } else if (month_choice >= 8 && month_choice <= 10) { //Sep-Nov, Fall
