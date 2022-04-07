@@ -385,6 +385,15 @@ fetch(RSS_URL)
 		location_name = ' Non-Branch Locations'; //start with a space so it sorts to the top
 	  }
 
+	  //get location details if present
+	  location_details_el = el.querySelector('location_details');
+	  location_details = '';
+	  if (location_details_el){
+		location_details = location_details_el.innerHTML;
+	    //remove CDATA tags
+		location_details = location_details.replace("<![CDATA[", "").replace("]]>", "").trim();
+	  }
+
       //FILTER
 	  //- by branch
 	  //- by date ranges (week: Monday date + 6 days; full month)
@@ -435,6 +444,7 @@ fetch(RSS_URL)
 			  event_blocks[location_name][ages_str][title] = {
 				'location': location_name,
 				'nonbranch_location': nonbranch_location_name,
+				'location_details': location_details,
 				'ages_str': ages_str,
 				'title': title,
 				'description': description,
@@ -538,6 +548,7 @@ fetch(RSS_URL)
 					` + (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') + `
 					` + event.dates.join('') + `
 					` + (event.nonbranch_location==='' ? '' : `<div><b>Location:</b> ${event.nonbranch_location}</div>`) + `
+					` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
 					` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
 						<div>${event.reg_required_str}</div>
 					</p>
