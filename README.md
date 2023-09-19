@@ -1,5 +1,5 @@
 # biblio-calendar
-BiblioEvents Calendar Generator (BiblioCommons)
+BiblioEvents Calendar Helper (BiblioCommons)
 
 GOALS
 - Provide a variety of ways to organize, limit and display upcoming events
@@ -7,6 +7,7 @@ GOALS
 CURRENT FEATURES
 - Limit by month or season
 - Limit by branch, or show all
+- Limit by some special event types (e.g. storytimes, non-storytimes, adult book clubs)
 - Show or Hide descriptions
 - Group events by audience
 - Combine events with the same title; show descriptions if they are different
