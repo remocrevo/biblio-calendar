@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>BiblioEvents Calendar Helper</title>
+</head>
+<style>
+.float_right {
+	float:right;
+}
+</style>
+
+<body>
+
+<div id="loading_img" style="" class="float_right"><img src="" /></div>
+
+<span id="hide_descriptions_span"></span>
+<span id="month_selector"></span>
+<span id="branch_selector"></span>
+
+<div id="events"></div>
+
+
+<script>
+/*
+BiblioCommons BiblioEvents API parser
+written by Remington Steed for Kent District Library, 2022
+rsteed@kdl.org
+
+GOALS
+- Provide a variety of ways to organize, limit and display upcoming events
+
+CURRENT FEATURES
+- Limit by month or season
+- Limit by branch, or show all
+- Limit by certain event types (e.g. Storytimes, Non-Storytimes, Adult Book Discussions)
+- Show or Hide descriptions
+- Group events by audience
+- Combine events with the same title; show descriptions if they are different
+- Summarize multiple dates into a range:
+	- currently supports 3+ weekly events:
+		Tuesday, Oct. 19, 10:00 AM to 10:30 AM
+		Tuesday, Oct. 26, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 2, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 9, 10:00 AM to 10:30 AM
+		Tuesday, Nov. 16, 10:00 AM to 10:30 AM
+		becomes:
+		Tuesday, Oct. 19 - Nov. 16
+
+TODO
+- cache API results for 5 minutes?
+- improve method of sleeping/waiting between API fetches
+
+*/
+
+
+// ------------------------------------
+// ------------------------------------
+// ---          OPTIONS             ---
+// ------------------------------------
+// ------------------------------------
+
+
+//YOUR LIBRARY ID
+const LIBRARY_ID = 'kdl';
+
+//YOUR PRIVATE API KEY
+const PRIVATE_API_KEY = '[.....put your BiblioEvents API key here.....]';
+
+
+
+//your age groups, listed in the order you want them displayed
+const age_groups_in_order = [
+	'All Ages',
+	'Young Children (ages 0-5)',
+	'School Age (ages 5-10)',
+	'Teens (ages 11-17)',
+	'Adults (18+)',
+	'Adults (21+)',
+	'Seniors (55+)',
+];
+//TODO: fetch/cache these from API
+const audience_ids = {
+	"Adults (18+)": "5f18606be872952f007aa188",
+	"Adults (21+)": "615f02425ecaed2f0042aa27",
+	"All Ages": "5f18607761c4983a0057d806",
+	"School Age (ages 5-10)": "5f18606ffa96324500584ed6",
+	"Seniors (55+)": "62a209f902cdff0876fa7130",
+	"Teens (ages 11-17)": "5ea31782d5498f2f0057022d",
+	"Young Children (ages 0-5)": "5f186074fa96324500584ed7"
+};
+
+//your Event Types, listed in the order you want them displayed
+//- all events that don't match one of these will be displayed in an "Other" category at the end
+const event_types_in_order = [
+	'Book Discussions',
+	'Adult Education',
+	'Gardening',
+	'Arts & Crafts',
+	'Teen Zone',
+	'Health & Wellness',
+	'Games & Gaming',
+	'Performance'
+];
+
+const event_types = {
+	"5ea317648309144500950cbd": "Adult Education",
+	"5f185f68e872952f007aa181": "Arts & Crafts",
+	"5f185f89e872952f007aa182": "Book Discussion",
+	"5f2c5330b01b002f00161856": "Book Sale",
+	"5f32acb77c571d2400f5586e": "Community Builders",
+	"5f2c533cffa16c24009bde33": "Computers & Technology Instruction",
+	"5f2c534affa16c24009bde34": "Games & Gaming",
+	"5f2c535cb01b002f00161857": "Gardening",
+	"5f2c536aa63d204500b1b196": "Health & Wellness",
+	"5f2c5389a63d204500b1b197": "History",
+	"5f2c5396a63d204500b1b198": "Job Assistance",
+	"5f2c540da63d204500b1b199": "Performance",
+	"5f2c5431ff053c3a00d39caa": "Science, Technology, Engineering & Math",
+
+	"5f2c53b8ffa16c24009bde36": "Music",
+	"5f2c5440b01b002f0016185b": "Storytime",
+	"60e8802314b90f4200823bc1": "Open Play",
+	"5f2c53cbff053c3a00d39ca2": "Outreach-Community Event",
+	"5f2c544fff053c3a00d39cab": "Writers WOrkshop",
+};
+const event_type_ids = {
+	"Book Discussion": "5f185f89e872952f007aa182",
+	"Storytime": "5f2c5440b01b002f0016185b",
+	"NON-STORYTIME": "5ea317648309144500950cbd,5f185f68e872952f007aa181,5f185f89e872952f007aa182,5f2c5330b01b002f00161856,5f32acb77c571d2400f5586e,5f2c533cffa16c24009bde33,5f2c534affa16c24009bde34,5f2c535cb01b002f00161857,5f2c5389a63d204500b1b197,5f2c5396a63d204500b1b198,5f2c540da63d204500b1b199,5f2c5431ff053c3a00d39caa,5f2c53b8ffa16c24009bde36,60e8802314b90f4200823bc1,5f2c544fff053c3a00d39cab" //exclude Health/Wellness b/c of summer lunches
+};
+
+
+//PRELOAD "WAITING" IMAGES TO DISPLAY WHILE LOADING API DATA
+//also randomly add one to the page
+var images = new Array()
+function preload() {
+	for (i = 0; i < preload.arguments.length; i++) {
+		images[i] = new Image()
+		images[i].src = preload.arguments[i]
+	}
+}
+preload(
+	//Princess Bride
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/as_you_wish.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/im_waiting.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/mostly_dead.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/skip_to_the_end.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/wait_just_wait.gif'
+);
+var loading_img = images[Math.floor(Math.random() * images.length)];
+document.getElementById('loading_img').firstChild.src = loading_img.src;
+
+
+
+// ------------------------------------
+// Setup variables
+// ------------------------------------
+
+//the URL of the BiblioEvents API
+const API_BASE_URL = 'https://api2.bibliocommons.com/v1/' + LIBRARY_ID;
+
+//parse URL parameters
+//- url_params.get("branch") returns the null object if param not present
+var url_params = new URL(window.location.href).searchParams;
+
+
+// -----------------------------------
+// --- CREATE DESCRIPTION CHECKBOX ---
+// -----------------------------------
+
+//param for hiding descriptions
+var hide_descriptions = url_params.get("hide_descriptions");
+
+checked = (hide_descriptions === 'true') ? ' checked' : '';
+checkbox_html = '<label for="hide_descriptions">Hide descriptions</label> <input' + checked + ' type="checkbox" id="hide_descriptions" name="hide_descriptions"  onChange="changeParam(\'hide_descriptions\', this.checked)" />';
+document.getElementById('hide_descriptions_span').insertAdjacentHTML('afterbegin', checkbox_html);
+
+
+
+
+//prepare throttled version of fetch function
+//- BiblioCommons limits to 5 calls per second
+const throttled_fetch = throttle(fetch_all_pages, 200);
+
+
+//TODO: allow choosing events by "program" and/or "type"
+//GET /events/programs
+//GET /events/types
+
+
+
+// ------------------------------------
+// Fetch branch data
+// ------------------------------------
+
+var filter_location_code = url_params.get("branch");
+filter_location_code = (filter_location_code != null) ? filter_location_code : 'ALP';  //TODO: don't hardcode! default to branches[0]
+
+
+//fetch branch data, then create dropdown
+//TODO: fetch events "near" the lat/lng of the requested location (is this necessary?)
+var branches;
+var branch_json_promise = throttled_fetch(API_BASE_URL + '/locations?limit=50')
+	.then(json_responses => {
+		branches = json_responses[0].entities.locations;
+		//lat = branch.mapLocation.centrePoint.lat
+		//lng = branch.mapLocation.centrePoint.lng
+		///events?near=`{lng},{lat}`
+		
+		//create location divs that will hold output
+		div = document.createElement("div");
+		div.id = 'events_BC_VIRTUAL';
+		document.getElementById('events').appendChild(div);
+
+		div = document.createElement("div");
+		div.id = 'events_NON';
+		document.getElementById('events').appendChild(div);
+
+		var branch_choices = {
+			//TODO: not supported yet	//'NON': '- NON-BRANCH LOCATIONS -',
+			'EVERYTHING': '- EVERYTHING -',
+			'ALL_AGES': '- ALL Programs marked "All Ages" -',
+			'ALL_ADULT': '- ALL Adult Events (tagged 18+) -',
+			'ALL_ADULT_21': '- ALL Adult Events (tagged 21+) -',
+			'ALL_ADULT_BOOKDISCUSSIONS': '- Adult Book Discussions -',
+			'ALL_TEEN': '- ALL Teen Events -',
+			'ALL_YOUTH_NONSTORYTIMES': '- ALL Youth Events (excluding storytimes) -',
+			'ALL_STORYTIMES': '- ALL Storytimes -',
+			'BC_VIRTUAL': 'Online'
+		};
+
+		Object.keys(branches).forEach(branch_code => {
+			branch_choices[branch_code] = branches[branch_code].name;
+			div_id = 'events_' + branch_code;
+			div = document.createElement("div");
+			div.id = div_id;
+			document.getElementById('events').appendChild(div);
+		});
+
+
+// ------------------------------
+// --- CREATE BRANCH DROPDOWN ---
+// ------------------------------
+
+		//default to first branch
+		filter_location_code = filter_location_code ? filter_location_code : 'ALP';
+		filter_location_name = branch_choices[filter_location_code];
+
+
+		//dropdown for all of this year
+		select_html = '<select name="branch" onchange="changeParam(\'branch\', this.value)">';
+		for (branch_code in branch_choices) {
+			selected = (branch_code === filter_location_code) ? ' selected="selected"' : '';
+			select_html += '<option' + selected + ' value="' + branch_code + '">' + branch_choices[branch_code] + '</option>';
+		}
+		select_html += '</select>';
+
+		document.getElementById('branch_selector').insertAdjacentHTML('afterbegin', select_html);
+
+	});
+	
+	
+
+//OPTIONS for DateTimeFormat. This affects the date and time display.
+//Choose which you want, and comment the others.
+locale = 'en-US';
+dt_options = {
+	weekday: 'long',	//'narrow', 'short', 'long'
+	//era: 'narrow',	//'narrow', 'short', 'long'
+	month: '2-digit',	//'2-digit', 'numeric', 'narrow', 'short', 'long'
+	day: 'numeric',		//'2-digit', 'numeric'
+	hour: 'numeric',	//'2-digit', 'numeric'
+	minute: '2-digit',	//'2-digit', 'numeric'
+	//second: '2-digit',	//'2-digit', 'numeric'
+	//timeZoneName: 'short',	//'short', 'long'
+	//year: 'numeric',	//'2-digit', 'numeric'
+};
+const DTF = new Intl.DateTimeFormat(locale, dt_options);
+//DTF.formatToParts() returns an array of this form:
+//- parts[0] is the first option from above
+//- parts[2] is the second
+//- parts[4] is the third
+//- parts[6] is the fourth
+
+
+
+// ------------------------------
+// --- CREATE MONTHS DROPDOWN ---
+// ------------------------------
+
+//AP Style calls for the following months to be abbreviated: Jan., Feb., Aug., Sept., Oct., Nov. and Dec.
+const months = [
+	{AP: 'Jan.', full: 'January'}, //0
+	{AP: 'Feb.', full: 'February'}, //1
+	{AP: 'March', full: 'March'},
+	{AP: 'April', full: 'April'},
+	{AP: 'May', full: 'May'},
+	{AP: 'June', full: 'June'},
+	{AP: 'July', full: 'July'},
+	{AP: 'Aug.', full: 'August'},
+	{AP: 'Sept.', full: 'September'},
+	{AP: 'Oct.', full: 'October'},
+	{AP: 'Nov.', full: 'November'},
+	{AP: 'Dec.', full: 'December'} //11
+];
+
+const days_of_week = {
+	'Sunday': 'Sun',
+	'Monday': 'Mon',
+	'Tuesday': 'Tue',
+	'Wednesday': 'Wed',
+	'Thursday': 'Thu',
+	'Friday': 'Fri',
+	'Saturday': 'Sat'
+};
+
+//start with current month, 12 months total
+today = new Date();
+year_choice = today.getFullYear();
+month_choice = today.getMonth();
+date = new Date(year_choice, month_choice, 1); //first of this month
+this_month_YMD = date.toISOString().split("T")[0]; //date as YYYY-MM-DD
+
+//param for month, ex: 2021-09-01
+//default to this month
+var month_param = url_params.get("month") || this_month_YMD;
+chosen_date = month_param;
+console.log('chosen_date: ', chosen_date);
+//check if chosen_month is a season, like "fall_2021"
+month_pieces = chosen_date.split('_');
+season = month_pieces[0];
+season_year = month_pieces[1];
+
+
+year1 = year_choice;
+year2 = year1 + 1;
+year0 = year1 - 1;
+
+//dropdown for all of this year
+select_html = '<select name="month" onchange="changeParam(\'month\', this.value)"><option value="">- choose a date range -</option>';
+//prep season options
+selected = (season == 'spring') ? ' selected="selected"' : '';
+spring_thisyear = '<option' + selected + ' value="spring_' + year_choice + '">Spring ' + year_choice + '</option>';
+spring_nextyear = '<option' + selected + ' value="spring_' + year2 + '">Spring ' + year2 + '</option>';
+selected = (season == 'summer') ? ' selected="selected"' : '';
+summer = '<option' + selected + ' value="summer_' + year_choice + '">Summer ' + year_choice + '</option>';
+selected = (season == 'fall') ? ' selected="selected"' : '';
+fall = '<option' + selected + ' value="fall_' + year_choice + '">Fall ' + year_choice + '</option>';
+selected = (season == 'winter') ? ' selected="selected"' : '';
+winter_started_lastyear = '<option' + selected + ' value="winter_' + year0 + '">Winter ' + year0 + '-' + year1 + '</option>';
+winter_started_thisyear = '<option' + selected + ' value="winter_' + year1 + '">Winter ' + year1 + '-' + year2 + '</option>';
+
+//display two seasons based on today's date
+if (month_choice >= 0 && month_choice <= 1) { //Jan-Feb, Winter
+	select_html += winter_started_lastyear + spring_thisyear;
+} else if (month_choice >= 2 && month_choice <= 4) { //Mar-May, Spring
+	select_html += spring_thisyear + summer;
+} else if (month_choice >= 5 && month_choice <= 7) { //Jun-Aug, Summer
+	select_html += summer + fall;
+} else if (month_choice >= 8 && month_choice <= 10) { //Sep-Nov, Fall
+	select_html += fall + winter_started_thisyear;
+} else { //Dec, Winter
+	select_html += winter_started_thisyear + spring_nextyear;
+}
+//add a divider
+select_html += '<option disabled>&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</option>';
+for (var i = 0; i < 12; i++) {
+	date = new Date(year_choice, month_choice, 1); //first of the month
+	YMD = date.toISOString().split("T")[0]; //date as YYYY-MM-DD
+	month_name = months[date.getMonth()].full;
+	selected = (YMD === chosen_date) ? ' selected="selected"' : '';
+	select_html += '<option' + selected + ' value="' + YMD + '">' + month_name + ' ' + year_choice + '</option>';
+
+	month_choice++;
+	if (month_choice > 11) { //11 = December
+		month_choice = 0; //0 = January
+		year_choice++;
+	}
+}
+select_html += '</select>';
+
+document.getElementById('month_selector').insertAdjacentHTML('afterbegin', select_html);
+
+
+
+
+// -----------------
+// --- MAIN CODE ---
+// -----------------
+
+//calculate start/end dates for season options
+today = new Date();
+month_range = 1;
+if (['fall','winter','spring','summer'].includes(season)) {
+	month_range = 3;
+	if (season == 'spring') { chosen_date = season_year + '-03-01' }
+	if (season == 'summer') { chosen_date = season_year + '-06-01' }
+	if (season == 'fall')   { chosen_date = season_year + '-09-01' }
+	if (season == 'winter') { chosen_date = season_year + '-12-01' }
+}
+
+//default to next month
+if (typeof chosen_date === 'undefined') {
+	next_month = addMonths(today, 1);
+	//first day of next month
+	filter_start_date = new Date(today.getFullYear(), next_month.getMonth(), 1);
+} else {
+	chosen_date_pieces = chosen_date.split('-');
+	//use "chosen_date_pieces[1] - 1" since month is zero-indexed, so 0 = Jan
+	filter_start_date = new Date(chosen_date_pieces[0], chosen_date_pieces[1] - 1, chosen_date_pieces[2]); //defaults to local time, not GMT
+}
+
+//first day of the month after chosen month, or 3 months after if season
+//note: cloning the chosen date to be safe
+const filter_end_date = addMonths(new Date(filter_start_date.getTime()), month_range);
+
+
+
+var branches_done = 0;
+const all_titles = new Set(); //collect unique list of program titles
+
+
+const dt_filter_start = DTF.formatToParts(filter_start_date);
+
+day_of_week = dt_filter_start[0].value;
+month = dt_filter_start[2].value;
+year = dt_filter_start[10].value;
+filter_start_date_str = year + '-' + month + '-' + month;
+
+
+params = {
+	locations: filter_location_code,
+	startDate: filter_start_date.toISOString().substring(0,10), //ex: 2022-06-01
+	endDate: filter_end_date.toISOString().substring(0,10) //ex: 2022-09-01
+};
+
+API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+		+ '&locations=' + params.locations //let's do one location at a time
+		+ '&startDate=' + params.startDate
+		+ '&endDate=' + params.endDate
+		;
+	
+
+var event_output;
+if (filter_location_code === 'NON') {
+	//TODO: how can I search for events with a non-branch location?
+
+} else if (filter_location_code === 'EVERYTHING') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from the "all ages" audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			//+ '&audiences=' + audience_ids['All Ages'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_AGES') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from the "all ages" audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['All Ages'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_ADULT') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from adult and teen audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['Adults (18+)'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_ADULT_21') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from adult and teen audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['Adults (21+)'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_ADULT_55') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from adult and teen audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['Adults (55+)'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS') {
+	//TODO: fetch book cover images from catalog API
+	// - BiblioCore API key:  OgwCtxUYtp4xb2s0kEGGd5u5Q8Wigb1w9WOhWUkm
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from adult and teen audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['Adults (18+)'] //id1,id2
+			+ '&types=' + event_type_ids['Book Discussion']
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_TEEN') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all events from adult and teen audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences=' + audience_ids['Teens (ages 11-17)'] //id1,id2
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_STORYTIMES') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from young children/school ages/all ages audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences='
+				+ audience_ids['All Ages'] //id1,id2
+				+ ',' + audience_ids['Young Children (ages 0-5)']
+				+ ',' + audience_ids['School Age (ages 5-10)']
+			+ '&types=' + event_type_ids['Storytime']
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+} else if (filter_location_code === 'ALL_YOUTH_NONSTORYTIMES') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from young children/school ages/all ages audiences
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			//+ '&locations=' + params.locations //one location at a time
+			+ '&audiences='
+				+ audience_ids['All Ages'] //id1,id2
+				+ ',' + audience_ids['Young Children (ages 0-5)']
+				+ ',' + audience_ids['School Age (ages 5-10)']
+			+ '&types=' + event_type_ids['NON-STORYTIME']
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else {
+	//single location
+	branch_json_promise.then(temp => {
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		})
+	});
+}
+
+
+
+
+/********************
+ FUNCTIONS
+ ********************/
+
+//redirect to URL with updated parameters
+function changeParam(param, value) {
+	new_params = new URL(window.location.href).searchParams;
+	new_params.set(param, value);
+	window.location.search = new_params.toString();
+}
+
+//increment only the month of the date
+//- if date doesn't exist in new month (e.g. Feb 30), set to last day of the month
+function addMonths(date, months) {
+    var d = date.getDate();
+    date.setMonth(date.getMonth() + +months);
+    if (date.getDate() != d) {
+      date.setDate(0);
+    }
+    return date;
+}
+
+
+//fetch all pages for event listings
+//- can also fetch a single page (up to 50) of locations
+//TODO: support multiple pages for non-events (e.g. newResponse.locations.pagination.pages)
+function fetch_all_pages(url, page=1, responses = []) {
+	console.log('fetch_all_pages: ', url, page);
+	
+	//TODO: check the cache first
+	//- make branches cache for 3 months
+	//- make events cache for 1 hour? 10 minutes?
+	//https://medium.com/javascript-dots/cache-api-in-javascript-644380391681
+	return fetch(`${url}&page=${page}`, { // Append the page number to the base URL
+		headers: {
+			'x-api-key': PRIVATE_API_KEY
+		}
+	})
+	.then(response => response.json())
+	.then(newResponse => {
+		responses.push(newResponse); // add new response to array
+		
+		//recurse if not the last page
+		if (typeof newResponse.events !== 'undefined'
+			&& page < newResponse.events.pagination.pages)
+		{ 
+			page++;
+			console.log("Recursing to page ", page);
+			//TODO: seems bad to recurse to a differently named function
+			return throttled_fetch(url, page, responses); //call throttled version
+		}
+		return responses;
+	});
+	
+		
+} //end function
+
+
+async function hide_image_if_ready() {
+	console.log('hide gif');
+	//TODO: check if "page loaded" and "3_seconds_is_done"
+	document.getElementById('loading_img').style = 'display:none';
+}
+
+
+//age group map for efficient lookup of sortIndex
+var age_groups_index = {};
+for (var i=0; i < age_groups_in_order.length; i++)
+    age_groups_index[age_groups_in_order[i]] = i;
+
+function sort_age_groups(a, b) {
+	//only consider first age group in multi-group string (strip comma and after)
+	a = (a.indexOf(",") > -1) ? a.substring(0, a.indexOf(",")) : a;
+	b = (b.indexOf(",") > -1) ? b.substring(0, b.indexOf(",")) : b;
+	return (age_groups_index[a] - age_groups_index[b]) || a.localeCompare(b);
+}
+
+
+// Returns a function, that, when invoked, will only be triggered at most once
+// during a given window of time. Normally, the throttled function will run
+// as much as it can, without ever going more than once per `wait` duration;
+// but if you'd like to disable the execution on the leading edge, pass
+// `{leading: false}`. To disable execution on the trailing edge, ditto.
+function throttle(func, wait, options) {
+  var context, args, result;
+  var timeout = null;
+  var previous = 0;
+  if (!options) options = {};
+  var later = function() {
+    previous = options.leading === false ? 0 : Date.now();
+    timeout = null;
+    result = func.apply(context, args);
+    if (!timeout) context = args = null;
+  };
+  return function() {
+    var now = Date.now();
+    if (!previous && options.leading === false) previous = now;
+    var remaining = wait - (now - previous);
+    context = this;
+    args = arguments;
+    if (remaining <= 0 || remaining > wait) {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      previous = now;
+      result = func.apply(context, args);
+      if (!timeout) context = args = null;
+    } else if (!timeout && options.trailing !== false) {
+      timeout = setTimeout(later, remaining);
+    }
+    return result;
+  };
+};
+
+
+
+//If user chooses a single branch
+//- sort by age group (age_groups_in_order[])
+//If user chooses "All Adult/Teen Events"
+//- sort by type (event_types_in_order[])
+function sort_and_display(json_responses) {
+
+	let html = ``;
+	let event_blocks = new Array();
+
+	//collect data from each fetched page
+	json_responses.forEach(response_obj => {
+		event_ids = response_obj.events.items;
+		locations = response_obj.entities.locations;
+		nonbranch_locations = response_obj.entities.places;
+		events = response_obj.entities.events;
+		ev_audiences = response_obj.entities.eventAudiences;
+		//TODO: utilize other data, like programs and types
+		//programs = response_obj.entities.eventPrograms;
+		types = response_obj.entities.eventTypes;
+		console.log("how many events in this set? ", event_ids.length);
+		
+		event_ids.forEach(event_id => {
+			event = events[event_id].definition;
+			event_meta = events[event_id];
+
+			//is this event cancelled?
+			is_cancelled = event.isCancelled;
+
+			//break date strings into the pieces we need
+			start_date = event.start;
+			end_date = event.end;
+
+			event_start_datetime = new Date(start_date);
+			event_end_datetime = new Date(end_date);
+			let duration = event_end_datetime - event_start_datetime;
+			let duration_hours = (duration / (1000 * 60 * 60)).toFixed(1);
+			let duration_minutes = (duration / (1000 * 60)).toFixed(0);
+
+			//use the DateTimeFormat object we defined above
+			const dt_start = DTF.formatToParts(event_start_datetime);
+			const dt_end = DTF.formatToParts(event_end_datetime);
+
+			day_of_week = dt_start[0].value;
+			month = months[parseInt(dt_start[2].value)-1].AP; //formatted for AP style
+			month_excel = months[parseInt(dt_start[2].value)-1].full;
+			day_num = dt_start[4].value;
+
+			//create datetime output strings
+			//build the HTML output using template strings
+			start_time = `${dt_start[6].value}:${dt_start[8].value} ${dt_start[10].value}`;
+			end_time = `${dt_end[6].value}:${dt_end[8].value} ${dt_end[10].value}`;
+
+			description = event.description;
+
+
+			var is_bookclub = false;
+			event.typeIds.forEach(typeId => {
+				if (event_types[typeId] == 'Book Discussion') is_bookclub = true;
+			});
+			
+			//SPECIAL TREATMENT for book clubs
+			bookclub_title = '';
+			bookclub_author = '';
+			if (is_bookclub) {
+				//fix incomplete link
+				description = description.replace('href="/item/show/', 'href="https://kdl.bibliocommons.com/item/show/');
+				description = description.replaceAll('&nbsp;', ' ');
+				description = description.replaceAll('<em>', '');
+				description = description.replaceAll('</em>', '');
+				description = description.replaceAll('<i>', '');
+				description = description.replaceAll('</i>', '');
+				console.log(description);
+				
+				//use regex to grab URL, title and author
+				matches = description.match(/<a [^>]*href="(.*)">(.*)<\/a> *by (.*)/);
+				if (matches) {
+					console.log(matches);
+					bookclub_title = matches[2];
+					bookclub_author = matches[3];
+					//find and remove ending period
+					position_of_period = bookclub_author.lastIndexOf('.');
+					bookclub_author = bookclub_author.substring(0,position_of_period) + bookclub_author.substring(position_of_period+1);
+				} else {
+					bookclub_title = description;
+				}
+			}
+
+			location_id = event.branchLocationId;
+			nonbranch_id = event.nonBranchLocationId;
+			div_id = 'events_' + (location_id ? location_id : 'NON');
+
+			//handle non-branch locations
+			nonbranch_location_name = '';
+			if (location_id) {
+				location_name = locations[location_id].name;
+			} else {
+				location_name = ' Non-Branch Locations'; //start with a space so it sorts to the top
+				nonbranch_location_name = nonbranch_locations[nonbranch_id].name;
+				//look for "Online event" checkbox
+				if (nonbranch_location_name == 'Online event') {
+					//find the link in the description
+					let link = /<a[^>]+>.+?<\/a>/.exec(description);
+					nonbranch_location_name = 'Online';
+					if (Array.isArray(link) && link.length > 0) {
+						//show last match
+						nonbranch_location_name += ': ' + link[link.length-1];
+					}
+				}
+			}
+
+
+			title = event.title.trim();
+			
+			event_url = 'https://kdl.bibliocommons.com/events/' + event_id;
+			//NOTE: WHY ADD URL AND DATE?? IT'S FOR BRAD! Via Excel.
+			all_titles.add(title + ';' + event_url + ';' + month_excel + ' ' + day_num); //build list of all titles
+
+
+			//show if "Registration required"				
+			reg = event_meta.registrationWindow.windowStart; //null or datetime
+			reg_required_str = reg ? '<b>Registration required</b>' : '';
+			
+			//TODO: utilize other data within each event:
+			//- locationDetails
+			//- audienceIds, typeIds, languageIds
+			//- bibIds (we could use them for book clubs)
+			//- staffNotes
+			//- featuredImageId
+
+			//collect ages/audiences
+			ages_arr = [];
+			event.audienceIds.forEach(audience_id => {
+				ages_arr.push(ev_audiences[audience_id].name);
+			});
+			ages_str = ages_arr.sort(sort_age_groups).join(', ');
+			
+			//choose one primary event type from the assigned list of types
+			event_type = event_types[event.typeIds[0]];
+			//TODO: loop through typeIds, grab first one that exists in event_types_in_order[]
+			
+			
+
+			//FOR 'ALL_ADULT', group by event type first
+			if (filter_location_code === 'ALL_ADULT'
+				|| filter_location_code === 'ALL_ADULT_21'
+				|| filter_location_code === 'ALL_ADULT_55'
+				|| filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS'
+				|| filter_location_code === 'ALL_TEEN'
+				|| filter_location_code === 'ALL_YOUTH_NONSTORYTIMES'
+				|| filter_location_code === 'ALL_AGES'
+				|| filter_location_code === 'EVERYTHING'
+			) {
+				//build the HTML output using template strings
+				
+				/***************
+				* HACK: Use title in place of event type to quickly sort by that instead. Except for book clubs.
+				****************/
+				event_type = is_bookclub ? "Book Discussion " + location_name : title;
+				
+				time_str = `${start_time}`;
+				duration = (duration_hours === '1.0') ? ' One hour.' : ` ${duration_minutes} minutes.`;
+				if (duration_hours === '2.0') duration = ' Two hours.';
+				description = description.replace('</p>', duration + '</p>')
+				
+				if (typeof event_blocks[event_type] === 'undefined') {
+					event_blocks[event_type] = new Array();
+				}
+				if (typeof event_blocks[event_type][ages_str] === 'undefined') {
+					event_blocks[event_type][ages_str] = new Array();
+				}
+				if (typeof event_blocks[event_type][ages_str][title] === 'undefined') {
+					event_blocks[event_type][ages_str][title] = {
+						'event_type': event_type,
+						'is_bookclub': is_bookclub,
+						'location': location_name,
+						'nonbranch_location': nonbranch_location_name,
+						'ages_str': ages_str,
+						'title': title,
+						'description': description,
+						'reg_required_str': reg_required_str,
+						'cancelled': (is_cancelled ? '[CANCELLED]' : ''),
+						'dates': ['<h4>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</h4>'],
+						'dates_bookclub': [month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
+							+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
+							+ '<br>'],
+						'time_bookclub': day_of_week + 's at ' + time_str + '<br>',
+						'date_objects': [event_start_datetime]
+					}
+				} else {
+					event_blocks[event_type][ages_str][title].dates.push('<h4>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</h4>'),
+					event_blocks[event_type][ages_str][title].dates_bookclub.push(month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
+							+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
+						+ '<br>'),
+					event_blocks[event_type][ages_str][title].date_objects.push(event_start_datetime);
+				}
+
+			} else {
+				//FOR SINGLE BRANCH, group by age group first
+				
+				//if exactly 1 hour long, simplify time display
+				time_str = (duration_hours === '1.0') ? `${start_time}` : `${start_time} to ${end_time}`;
+				
+				//build the HTML output using template strings
+				if (typeof event_blocks[location_name] === 'undefined') {
+					event_blocks[location_name] = new Array();
+				}
+				if (typeof event_blocks[location_name][ages_str] === 'undefined') {
+					event_blocks[location_name][ages_str] = new Array();
+				}
+				if (typeof event_blocks[location_name][ages_str][title] === 'undefined') {
+					event_blocks[location_name][ages_str][title] = {
+						'location': location_name,
+						'nonbranch_location': nonbranch_location_name,
+						'is_bookclub': is_bookclub,
+						'ages_str': ages_str,
+						'title': title,
+						'description': description,
+						'reg_required_str': reg_required_str,
+						'cancelled': (is_cancelled ? '[CANCELLED]' : ''),
+						'dates': ['<div>' + day_of_week + ', ' + month + ' ' + day_num + ', ' + time_str + '</div>'],
+						'date_objects': [event_start_datetime]
+					}
+				} else {
+					if (event_blocks[location_name][ages_str][title].description !== description) {
+						event_blocks[location_name][ages_str][title].description += '<div>' + month + ' ' + day_num + ': ' + description + '</div>';
+					}
+					event_blocks[location_name][ages_str][title].dates.push('<div>' + day_of_week + ', ' + month + ' ' + day_num + ', ' + time_str + '</div>');
+					event_blocks[location_name][ages_str][title].date_objects.push(event_start_datetime);
+				}
+			} //end if (filter_location_code === 'ALL_ADULT')
+			
+			
+		}); //end foreach event_ids
+	}); //end foreach json_responses
+
+
+	//-----------------------------------
+	//-- SORT, LOOP AND DISPLAY EVENTS --
+	//-----------------------------------
+
+	//sort event blocks by location
+	const event_blocks_ordered = Object.keys(event_blocks).sort().reduce(
+		(obj, key) => { 
+			obj[key] = event_blocks[key]; 
+			return obj;
+		}, 
+		{}
+	);
+
+
+	//FOR 'ALL_ADULT', sort by event type first
+	
+	
+	//***TODO: SORT BY TITLE INSTEAD, don't display event type
+	
+	
+	if (filter_location_code === 'ALL_ADULT'
+		|| filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS'
+		|| filter_location_code === 'ALL_ADULT_21'
+		|| filter_location_code === 'ALL_ADULT_55'
+		|| filter_location_code === 'ALL_TEEN'
+		|| filter_location_code === 'ALL_YOUTH_NONSTORYTIMES'
+		|| filter_location_code === 'ALL_AGES'
+		|| filter_location_code === 'EVERYTHING'
+	) {
+
+		//loop through multi-layer array, building the output string
+		//- locations come first
+		for (const [type_key, type_name] of Object.entries(event_blocks_ordered)) {
+			//html += `<h1>${type_key}</h1>`;
+			
+			//sort this event types's age groups in custom order
+			const age_groups_ordered = Object.keys(type_name).sort(sort_age_groups).reduce(
+			  (obj, key) => { 
+				obj[key] = type_name[key]; 
+				return obj;
+			  }, 
+			  {}
+			);
+
+			//loop through age groups
+			for (const [age_key, age_group] of Object.entries(age_groups_ordered)) {
+				for (const [event_key, event] of Object.entries(age_group)) {
+					//build event output with all dates joined in the correct place
+					//- summarize multiple dates into a range
+					//TODO: remove date from array as pattern is found, so we can repeat the process with a new first date; e.g. first find "Mondays", then find "Wednesdays", etc.
+					var temp_date = event.date_objects[0];
+
+					//use our DateTimeFormat object
+					const dt_temp = DTF.formatToParts(temp_date);
+					first_month = months[parseInt(dt_temp[2].value)-1].AP; //formatted for AP style
+					first_day_num = dt_temp[4].value;
+
+					var date_range_str = '';
+					temp_end_date = '';
+					range_closed = 0;
+					for (var i = 1; i < event.date_objects.length; i++) {
+						temp_date.setDate(temp_date.getDate() + 7);
+						if ((range_closed==0) && (event.date_objects[i].getTime() == temp_date.getTime())) {
+							temp_end_date = event.date_objects[i];
+						} else {
+							range_closed = 1;
+							break;
+						}
+					}
+					//only make range if more than 2 events (i>2) OR if all events are in range
+					if (i>2 && 
+						(range_closed == 1 || 
+							(i == event.date_objects.length
+							&& temp_end_date!='')
+						)
+					) {
+						//use our DateTimeFormat object
+						const dt_temp_end = DTF.formatToParts(temp_end_date);
+						month = months[parseInt(dt_temp_end[2].value)-1].AP; //formatted for AP style
+						day_num = dt_temp_end[4].value;
+						day_of_week = dt_temp_end[0].value;
+						start_time = `${dt_temp_end[6].value}:${dt_temp_end[8].value} ${dt_temp_end[10].value}`;
+
+						date_range_str = `${day_of_week}s, ${first_month} ${first_day_num} - ${month} ${day_num}, ${start_time}`;
+					}
+					
+					if (event.is_bookclub) {
+						if (!event.cancelled) {
+							html += `
+								<h2>${event.location}</h2>
+								<p>
+								` + `<strong>${event.title}</strong><br>
+								` + `${event.time_bookclub}<br>
+								` + event.dates_bookclub.join('') + `<br>
+								` + (event.location_details ? `(Details: ${event.location_details})` : '') + `${event.reg_required_str}<br>
+								</p>
+							`;
+						}
+					} else {
+						html += `
+								${event.cancelled} <h2>${event.title}</h2>
+							` + (hide_descriptions==='true' ? '' : `<p>${event.description}</p>`) + `
+							` + (date_range_str!='' ? `<h3>${date_range_str}</h3>` : '') + `
+							` + event.dates.join('') + `
+							` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
+								<p>${event.reg_required_str}</p>
+						`;
+					}
+				}
+			}
+		}
+
+	} else {
+	
+		//loop through multi-layer array, building the output string
+		//- locations come first
+		for (const [location_key, location_name] of Object.entries(event_blocks_ordered)) {
+			html += `
+				<h1>${location_key}</h1>
+			`;
+			//sort this location's age groups in custom order
+			const age_groups_ordered = Object.keys(location_name).sort(sort_age_groups).reduce(
+			  (obj, key) => { 
+				obj[key] = location_name[key]; 
+				return obj;
+			  }, 
+			  {}
+			);
+
+			//loop through age groups
+			for (const [age_key, age_group] of Object.entries(age_groups_ordered)) {
+				html += `
+				<h3>For ${age_key}</h3>
+				`;
+				for (const [event_key, event] of Object.entries(age_group)) {
+					//build event output with all dates joined in the correct place
+					//- summarize multiple dates into a range
+					//TODO: remove date from array as pattern is found, so we can repeat the process with a new first date; e.g. first find "Mondays", then find "Wednesdays", etc.
+					var temp_date = event.date_objects[0];
+
+					//use our DateTimeFormat object
+					const dt_temp = DTF.formatToParts(temp_date);
+					first_month = months[parseInt(dt_temp[2].value)-1].AP; //formatted for AP style
+					first_day_num = dt_temp[4].value;
+
+					var date_range_str = '';
+					temp_end_date = '';
+					range_closed = 0;
+					for (var i = 1; i < event.date_objects.length; i++) {
+						temp_date.setDate(temp_date.getDate() + 7);
+						if ((range_closed==0) && (event.date_objects[i].getTime() == temp_date.getTime())) {
+							temp_end_date = event.date_objects[i];
+						} else {
+							range_closed = 1;
+							break;
+						}
+					}
+					//only make range if more than 2 events (i>2) OR if all events are in range
+					if (i>2 && 
+						(range_closed == 1 || 
+							(i == event.date_objects.length
+							&& temp_end_date!='')
+						)
+					) {
+						//use our DateTimeFormat object
+						const dt_temp_end = DTF.formatToParts(temp_end_date);
+						month = months[parseInt(dt_temp_end[2].value)-1].AP; //formatted for AP style
+						day_num = dt_temp_end[4].value;
+						day_of_week = dt_temp_end[0].value;
+						start_time = `${dt_temp_end[6].value}:${dt_temp_end[8].value} ${dt_temp_end[10].value}`;
+
+						date_range_str = `${day_of_week}s, ${first_month} ${first_day_num} - ${month} ${day_num}, ${start_time}`;
+					}
+					
+					html += `
+						<div style="margin-top:1em; font-size:10px;">
+							<div>${event.cancelled} <span style="font-size:12px; font-weight:bold">${event.title}</span></div>
+						` + (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') + `
+						` + event.dates.join('') + `
+						` + (event.nonbranch_location ? `Location: ${event.nonbranch_location}` : '') + `
+						` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
+						` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
+							<div>${event.reg_required_str}</div>
+						</div>
+					`;
+				}
+			}
+		}
+
+	}
+
+
+
+	//display event output
+	document.getElementById(div_id).insertAdjacentHTML('beforeend', html);
+
+	//print sorted list of titles
+	all_events = '<h3>All Events in This Timeframe</h3><div>(Paste into Excel)</div><p>' + [...all_titles].sort().join('<br>');
+
+	document.getElementById(div_id).insertAdjacentHTML('beforeend', all_events);
+	branches_done++;
+
+}
+
+
+</script>
+
+</html>
