@@ -3,10 +3,24 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 	<title>BiblioEvents Calendar Helper</title>
+	<link href="https://fonts.cdnfonts.com/css/euclid-flex" rel="stylesheet">
 </head>
 <style>
+body {
+	font-family: 'Euclid Square', sans-serif;
+}
 .float_right {
 	float:right;
+}
+.border {
+	padding: .7em;
+	margin: .2em .2em 0 0;
+	border: 1px solid lightGray;	
+}
+select {
+	padding: .6em;
+	border-radius: .6em;
+	border: 1px solid gray;
 }
 </style>
 
@@ -14,17 +28,23 @@
 
 <div id="loading_img" style="" class="float_right"><img src="" /></div>
 
-<span id="hide_descriptions_span"></span>
+<span id="checkboxes_span"></span>
 <span id="month_selector"></span>
 <span id="branch_selector"></span>
 
-<div id="events"></div>
+<p id="notes"><b>NOTE: Keep in mind holidays, <a target="_blank" href="https://kentdistrictlibrary.sharepoint.com/:f:/s/CentralServices-Administration/EgbZFfno57NAtTE81f3gNWEBq84w_RckhrTtNush23QJRg?e=TrS8nE">KDL system-wide closings</a>, voting days, etc.</b></p>
 
+
+<button onclick="Export2Word('events', 'biblioevents_script_export.doc');">Export as .doc</button>
+
+<div id="events"></div>
+<div id="events_excel"></div>
 
 <script>
 /*
 BiblioCommons BiblioEvents API parser
-written by Remington Steed for Kent District Library, 2022
+v. 1.1, Sept. 2023 (codename Groove)
+written by Remington Steed for Kent District Library
 rsteed@kdl.org
 
 GOALS
@@ -64,14 +84,14 @@ TODO
 //YOUR LIBRARY ID
 const LIBRARY_ID = 'kdl';
 
-//YOUR PRIVATE API KEY
-const PRIVATE_API_KEY = '[.....put your BiblioEvents API key here.....]';
-
+//YOUR PRIVATE EVENTS API KEY
+const PRIVATE_EVENTS_API_KEY = '[.....put your BiblioEvents API key here.....]';
 
 
 //your age groups, listed in the order you want them displayed
 const age_groups_in_order = [
 	'All Ages',
+	'Families with Children',
 	'Young Children (ages 0-5)',
 	'School Age (ages 5-10)',
 	'Teens (ages 11-17)',
@@ -81,18 +101,19 @@ const age_groups_in_order = [
 ];
 //TODO: fetch/cache these from API
 const audience_ids = {
+	"All Ages": "5f18607761c4983a0057d806",
+	"Families with Children": "6553a007eb28943d0077b745",
+	"Young Children (ages 0-5)": "5f186074fa96324500584ed7",
+	"School Age (ages 5-10)": "5f18606ffa96324500584ed6",
+	"Teens (ages 11-17)": "5ea31782d5498f2f0057022d",
 	"Adults (18+)": "5f18606be872952f007aa188",
 	"Adults (21+)": "615f02425ecaed2f0042aa27",
-	"All Ages": "5f18607761c4983a0057d806",
-	"School Age (ages 5-10)": "5f18606ffa96324500584ed6",
 	"Seniors (55+)": "62a209f902cdff0876fa7130",
-	"Teens (ages 11-17)": "5ea31782d5498f2f0057022d",
-	"Young Children (ages 0-5)": "5f186074fa96324500584ed7"
 };
 
 //your Event Types, listed in the order you want them displayed
 //- all events that don't match one of these will be displayed in an "Other" category at the end
-const event_types_in_order = [
+/* const event_types_in_order = [
 	'Book Discussions',
 	'Adult Education',
 	'Gardening',
@@ -101,8 +122,9 @@ const event_types_in_order = [
 	'Health & Wellness',
 	'Games & Gaming',
 	'Performance'
-];
+]; */
 
+//TODO: fetch/cache these from API
 const event_types = {
 	"5ea317648309144500950cbd": "Adult Education",
 	"5f185f68e872952f007aa181": "Arts & Crafts",
@@ -122,14 +144,43 @@ const event_types = {
 	"5f2c5440b01b002f0016185b": "Storytime",
 	"60e8802314b90f4200823bc1": "Open Play",
 	"5f2c53cbff053c3a00d39ca2": "Outreach-Community Event",
-	"5f2c544fff053c3a00d39cab": "Writers WOrkshop",
+	"5f2c544fff053c3a00d39cab": "Writers Workshop",
 };
 const event_type_ids = {
 	"Book Discussion": "5f185f89e872952f007aa182",
+	"NON-BOOKDISCUSSION": "5ea317648309144500950cbd,5f185f68e872952f007aa181,5f185f7afa96324500584e82,5f2c5330b01b002f00161856,5f32acb77c571d2400f5586e,5f2c533cffa16c24009bde33,5f2c534affa16c24009bde34,5f2c535cb01b002f00161857,5f2c536aa63d204500b1b196,5f2c5389a63d204500b1b197,649c5afb2bca9100162c04ed,5f2c53a6ffa16c24009bde35,64b7e015df24b6f55d8be783,5f2c53b8ffa16c24009bde36,60e8802314b90f4200823bc1,649c56846c475e7a1571bcf1,5f2c540da63d204500b1b199,5f2c5431ff053c3a00d39caa,5f2c5440b01b002f0016185b,5f2c544fff053c3a00d39cab,650453e0c102fe4100a9115c",
 	"Storytime": "5f2c5440b01b002f0016185b",
-	"NON-STORYTIME": "5ea317648309144500950cbd,5f185f68e872952f007aa181,5f185f89e872952f007aa182,5f2c5330b01b002f00161856,5f32acb77c571d2400f5586e,5f2c533cffa16c24009bde33,5f2c534affa16c24009bde34,5f2c535cb01b002f00161857,5f2c5389a63d204500b1b197,5f2c5396a63d204500b1b198,5f2c540da63d204500b1b199,5f2c5431ff053c3a00d39caa,5f2c53b8ffa16c24009bde36,60e8802314b90f4200823bc1,5f2c544fff053c3a00d39cab" //exclude Health/Wellness b/c of summer lunches
+	"NON-STORYTIME": "5ea317648309144500950cbd,5f185f68e872952f007aa181,5f185f89e872952f007aa182,5f2c5330b01b002f00161856,5f32acb77c571d2400f5586e,5f2c533cffa16c24009bde33,5f2c534affa16c24009bde34,5f2c535cb01b002f00161857,5f2c5389a63d204500b1b197,5f2c5396a63d204500b1b198,5f2c540da63d204500b1b199,5f2c5431ff053c3a00d39caa,5f2c53b8ffa16c24009bde36,60e8802314b90f4200823bc1,5f2c544fff053c3a00d39cab,5f2c536aa63d204500b1b196" //in summer, exclude Health/Wellness b/c of summer lunches: 5f2c536aa63d204500b1b196
 };
 
+//TODO: fetch/cache these from API
+const program_ids = {
+	'Bookmobile Visits': '5f2c5160b01b002f00161803',
+};
+
+//dropdown choices that need the alternate "multi-branch" display format (e.g. list of "date - branch name")
+const multibranch_display_choices = [
+	'ALL_AGES',
+	'FAMILIES',
+	'ALL_YOUNG_CHILDREN_NONSTORYTIMES',
+	'ALL_SCHOOL_AGE',
+	'ALL_TEEN',
+	'ALL_ADULT_21',
+	'ALL_ADULT_55',
+	'ALL_ADULT_BOOKDISCUSSIONS',
+	'ALL_ADULT_NONBOOKDISCUSSIONS',
+	'EVERYTHING'
+];
+
+// THESE GET A SIMPLE API CALL
+const simple_api_call_choices = {
+	'ALL_AGES': 'All Ages',
+	'FAMILIES': 'Families with Children',
+	'ALL_SCHOOL_AGE': 'School Age (ages 5-10)',
+	'ALL_TEEN': 'Teens (ages 11-17)',
+	'ALL_ADULT_21': 'Adults (21+)',
+	'ALL_ADULT_55': 'Adults (55+)'
+};
 
 //PRELOAD "WAITING" IMAGES TO DISPLAY WHILE LOADING API DATA
 //also randomly add one to the page
@@ -142,11 +193,17 @@ function preload() {
 }
 preload(
 	//Princess Bride
-	'https://kdl.org/wp-content/uploads/sites/88/2022/08/as_you_wish.gif',
+/*	'https://kdl.org/wp-content/uploads/sites/88/2022/08/as_you_wish.gif',
 	'https://kdl.org/wp-content/uploads/sites/88/2022/08/im_waiting.gif',
 	'https://kdl.org/wp-content/uploads/sites/88/2022/08/mostly_dead.gif',
 	'https://kdl.org/wp-content/uploads/sites/88/2022/08/skip_to_the_end.gif',
-	'https://kdl.org/wp-content/uploads/sites/88/2022/08/wait_just_wait.gif'
+	'https://kdl.org/wp-content/uploads/sites/88/2022/08/wait_just_wait.gif',
+*/
+	//Emperor's New Groove
+	'https://kdl.org/wp-content/uploads/sites/88/2023/10/emperor_allcomingtogether.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2023/10/emperor_squeaker.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2023/10/emperor_wronglever.gif',
+	'https://kdl.org/wp-content/uploads/sites/88/2023/10/emperor_5littlemonkeys.gif'
 );
 var loading_img = images[Math.floor(Math.random() * images.length)];
 document.getElementById('loading_img').firstChild.src = loading_img.src;
@@ -165,24 +222,41 @@ const API_BASE_URL = 'https://api2.bibliocommons.com/v1/' + LIBRARY_ID;
 var url_params = new URL(window.location.href).searchParams;
 
 
-// -----------------------------------
-// --- CREATE DESCRIPTION CHECKBOX ---
-// -----------------------------------
+// -------------------------
+// --- CREATE CHECKBOXES ---
+// -------------------------
 
 //param for hiding descriptions
 var hide_descriptions = url_params.get("hide_descriptions");
-
 checked = (hide_descriptions === 'true') ? ' checked' : '';
-checkbox_html = '<label for="hide_descriptions">Hide descriptions</label> <input' + checked + ' type="checkbox" id="hide_descriptions" name="hide_descriptions"  onChange="changeParam(\'hide_descriptions\', this.checked)" />';
-document.getElementById('hide_descriptions_span').insertAdjacentHTML('afterbegin', checkbox_html);
+checkbox_html = '<span class="border"><label for="hide_descriptions">Hide descriptions</label> <input' + checked + ' type="checkbox" id="hide_descriptions" name="hide_descriptions"  onChange="changeParam(\'hide_descriptions\', this.checked)" /></span>';
+
+//param for hiding dates
+var hide_dates = url_params.get("hide_dates");
+checked = (hide_dates === 'true') ? ' checked' : '';
+checkbox_html += '<span class="border"><label for="hide_dates">Hide dates (i.e. TOC list)</label> <input' + checked + ' type="checkbox" id="hide_dates" name="hide_dates"  onChange="changeParam(\'hide_dates\', this.checked)" /></span>';
+
+//param for hiding book covers
+var hide_bookcovers = url_params.get("hide_bookcovers");
+checked = (hide_bookcovers === 'true') ? ' checked' : '';
+checkbox_html += '<span class="border"><label for="hide_bookcovers">Hide book cover images</label> <input' + checked + ' type="checkbox" id="hide_bookcovers" name="hide_bookcovers"  onChange="changeParam(\'hide_bookcovers\', this.checked)" /></span>';
+
+//param for "month calendar" mode
+var month_calendar = url_params.get("month_calendar");
+checked = (month_calendar === 'true') ? ' checked' : '';
+checkbox_html += '<span class="border"><label for="month_calendar">Youth Calendar Mode</label> <input' + checked + ' type="checkbox" id="month_calendar" name="month_calendar"  onChange="changeParam(\'month_calendar\', this.checked)" /></span>';
+
+document.getElementById('checkboxes_span').insertAdjacentHTML('afterbegin', checkbox_html);
 
 
 
 
 //prepare throttled version of fetch function
 //- BiblioCommons limits to 5 calls per second
-const throttled_fetch = throttle(fetch_all_pages, 200);
+const throttled_fetch = throttleAsync(fetch_all_pages, 200); //200 milliseconds
 
+//same for bibliocore api? not documented
+const throttled_fetch_bookcover = throttleAsync(searchBookAndDisplayImage, 200); //200 milliseconds
 
 //TODO: allow choosing events by "program" and/or "type"
 //GET /events/programs
@@ -219,17 +293,28 @@ var branch_json_promise = throttled_fetch(API_BASE_URL + '/locations?limit=50')
 
 		var branch_choices = {
 			//TODO: not supported yet	//'NON': '- NON-BRANCH LOCATIONS -',
-			'EVERYTHING': '- EVERYTHING -',
-			'ALL_AGES': '- ALL Programs marked "All Ages" -',
-			'ALL_ADULT': '- ALL Adult Events (tagged 18+) -',
-			'ALL_ADULT_21': '- ALL Adult Events (tagged 21+) -',
+			//1. Some Audiences
+			'ALL_AGES': '- Programs marked "All Ages" -',
+			'FAMILIES': '- Programs marked "Families with Children" -',
+			'ALL_TEEN': '- Teen Events -',
+			'ALL_SCHOOL_AGE': '- School Age Events (age 5-10) -',
+			'ALL_ADULT_21': '- Adult Events (tagged 21+) -',
+
+			//2. Special Groupings
+			'ALL_ADULT_NONBOOKDISCUSSIONS': '- Adult Events (tagged 18+, excluding book discussions) -',
 			'ALL_ADULT_BOOKDISCUSSIONS': '- Adult Book Discussions -',
-			'ALL_TEEN': '- ALL Teen Events -',
-			'ALL_YOUTH_NONSTORYTIMES': '- ALL Youth Events (excluding storytimes) -',
+			'ALL_YOUNG_CHILDREN_NONSTORYTIMES': '- Young Children Events (age 0-5, excluding storytimes) -',
 			'ALL_STORYTIMES': '- ALL Storytimes -',
+			'TEEN_ZONES': '- Teen Zone programs -',
+			'KIDS_ZONES': '- Kids Zone programs -',
+			'MAMA_BEAR': '- Mama Bear and Baby Cubs programs -',
+			'HOMESCHOOL': '- Homeschool Hangout -',
+			'BOOKMOBILE': '- Bookmobile Visits -',
+			'EVERYTHING': '- EVERYTHING -',
 			'BC_VIRTUAL': 'Online'
 		};
 
+		//Branch Choices 3. Add each branch
 		Object.keys(branches).forEach(branch_code => {
 			branch_choices[branch_code] = branches[branch_code].name;
 			div_id = 'events_' + branch_code;
@@ -384,10 +469,12 @@ document.getElementById('month_selector').insertAdjacentHTML('afterbegin', selec
 
 
 
-
+// *********************************
 // -----------------
 // --- MAIN CODE ---
 // -----------------
+// *********************************
+
 
 //calculate start/end dates for season options
 today = new Date();
@@ -442,16 +529,40 @@ API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
 		;
 	
 
+/* TODO: refactor
+for many, the dropdown choice should set the audiences
+- All Ages
+- Families with Children
+- Adults (21+)
+- Adults (55+)
+- Teens (ages 11-17)
+- School Age (ages 5-10)
+SPECIAL CASES can change the API_URL if that's really needed
+- audience_ids['Adults (18+)'], event_type_ids['NON-BOOKDISCUSSION']
+- audience_ids['Adults (18+)'], event_type_ids['Book Discussion']
+- audience_ids['All Ages'], audience_ids['Young Children (ages 0-5)'], audience_ids['School Age (ages 5-10)'], event_type_ids['Storytime']
+- audience_ids['Young Children (ages 0-5)'], event_type_ids['NON-STORYTIME']
+- programs=5f2c5160b01b002f00161803 //Bookmobile Visits
+- term=Mama Bear
+- term=Homeschool Hangout
+- term=Teen Zone
+- term=Kids Zone
+*/
+
+
 var event_output;
 if (filter_location_code === 'NON') {
 	//TODO: how can I search for events with a non-branch location?
 
 } else if (filter_location_code === 'EVERYTHING') {
+
+	//TODO: refactor
+	//API_URL = ...
+	//move "Promise.all().then(throttled_fetch(...))" to after the If/Else blocks
+
 	Promise.all([branch_json_promise]).then(temp => {
 		//fetch all events from the "all ages" audience
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			//+ '&audiences=' + audience_ids['All Ages'] //id1,id2
 			+ '&startDate=' + params.startDate
 			+ '&endDate=' + params.endDate
 			;
@@ -464,12 +575,11 @@ if (filter_location_code === 'NON') {
 
 	});
 
-} else if (filter_location_code === 'ALL_AGES') {
+} else if (Object.keys(simple_api_call_choices).includes(filter_location_code)) {
 	Promise.all([branch_json_promise]).then(temp => {
 		//fetch all events from the "all ages" audience
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			+ '&audiences=' + audience_ids['All Ages'] //id1,id2
+			+ '&audiences=' + audience_ids[simple_api_call_choices[filter_location_code]] //id1,id2
 			+ '&startDate=' + params.startDate
 			+ '&endDate=' + params.endDate
 			;
@@ -482,48 +592,12 @@ if (filter_location_code === 'NON') {
 
 	});
 
-} else if (filter_location_code === 'ALL_ADULT') {
+} else if (filter_location_code === 'ALL_ADULT_NONBOOKDISCUSSIONS') {
 	Promise.all([branch_json_promise]).then(temp => {
 		//fetch all events from adult and teen audiences
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
 			+ '&audiences=' + audience_ids['Adults (18+)'] //id1,id2
-			+ '&startDate=' + params.startDate
-			+ '&endDate=' + params.endDate
-			;
-
-		//fetch and display events for single branch
-		throttled_fetch(API_URL).then(event_data => {
-			sort_and_display(event_data);
-			hide_image_if_ready();
-		});
-
-	});
-
-} else if (filter_location_code === 'ALL_ADULT_21') {
-	Promise.all([branch_json_promise]).then(temp => {
-		//fetch all events from adult and teen audiences
-		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			+ '&audiences=' + audience_ids['Adults (21+)'] //id1,id2
-			+ '&startDate=' + params.startDate
-			+ '&endDate=' + params.endDate
-			;
-
-		//fetch and display events for single branch
-		throttled_fetch(API_URL).then(event_data => {
-			sort_and_display(event_data);
-			hide_image_if_ready();
-		});
-
-	});
-
-} else if (filter_location_code === 'ALL_ADULT_55') {
-	Promise.all([branch_json_promise]).then(temp => {
-		//fetch all events from adult and teen audiences
-		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			+ '&audiences=' + audience_ids['Adults (55+)'] //id1,id2
+			+ '&types=' + event_type_ids['NON-BOOKDISCUSSION']
 			+ '&startDate=' + params.startDate
 			+ '&endDate=' + params.endDate
 			;
@@ -538,31 +612,11 @@ if (filter_location_code === 'NON') {
 
 } else if (filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS') {
 	//TODO: fetch book cover images from catalog API
-	// - BiblioCore API key:  OgwCtxUYtp4xb2s0kEGGd5u5Q8Wigb1w9WOhWUkm
 	Promise.all([branch_json_promise]).then(temp => {
 		//fetch all events from adult and teen audiences
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
 			+ '&audiences=' + audience_ids['Adults (18+)'] //id1,id2
 			+ '&types=' + event_type_ids['Book Discussion']
-			+ '&startDate=' + params.startDate
-			+ '&endDate=' + params.endDate
-			;
-
-		//fetch and display events for single branch
-		throttled_fetch(API_URL).then(event_data => {
-			sort_and_display(event_data);
-			hide_image_if_ready();
-		});
-
-	});
-
-} else if (filter_location_code === 'ALL_TEEN') {
-	Promise.all([branch_json_promise]).then(temp => {
-		//fetch all events from adult and teen audiences
-		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			+ '&audiences=' + audience_ids['Teens (ages 11-17)'] //id1,id2
 			+ '&startDate=' + params.startDate
 			+ '&endDate=' + params.endDate
 			;
@@ -579,7 +633,6 @@ if (filter_location_code === 'NON') {
 	Promise.all([branch_json_promise]).then(temp => {
 		//fetch all storytime events from young children/school ages/all ages audiences
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
 			+ '&audiences='
 				+ audience_ids['All Ages'] //id1,id2
 				+ ',' + audience_ids['Young Children (ages 0-5)']
@@ -597,16 +650,104 @@ if (filter_location_code === 'NON') {
 
 	});
 
-} else if (filter_location_code === 'ALL_YOUTH_NONSTORYTIMES') {
+
+
+} else if (filter_location_code === 'ALL_YOUNG_CHILDREN_NONSTORYTIMES') {
 	Promise.all([branch_json_promise]).then(temp => {
-		//fetch all storytime events from young children/school ages/all ages audiences
+		//fetch all storytime events from young children audience
 		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
-			//+ '&locations=' + params.locations //one location at a time
-			+ '&audiences='
-				+ audience_ids['All Ages'] //id1,id2
-				+ ',' + audience_ids['Young Children (ages 0-5)']
-				+ ',' + audience_ids['School Age (ages 5-10)']
+			+ '&audiences=' + audience_ids['Young Children (ages 0-5)']
 			+ '&types=' + event_type_ids['NON-STORYTIME']
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else if (filter_location_code === 'BOOKMOBILE') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all with type Bookmobile
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			+ '&programs=' + program_ids['Bookmobile Visits']
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else if (filter_location_code === 'MAMA_BEAR') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from school age audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			+ '&term=Mama Bear'
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else if (filter_location_code === 'HOMESCHOOL') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from school age audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			+ '&term=Homeschool Hangout'
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else if (filter_location_code === 'TEEN_ZONES') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from school age audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			+ '&term="Teen Zone"'
+			+ '&startDate=' + params.startDate
+			+ '&endDate=' + params.endDate
+			;
+
+		//fetch and display events for single branch
+		throttled_fetch(API_URL).then(event_data => {
+			sort_and_display(event_data);
+			hide_image_if_ready();
+		});
+
+	});
+
+
+} else if (filter_location_code === 'KIDS_ZONES') {
+	Promise.all([branch_json_promise]).then(temp => {
+		//fetch all storytime events from school age audience
+		API_URL = API_BASE_URL + '/events?limit=50' //Biblio limits this to 50 per page
+			+ '&term="Kids Zone"'
 			+ '&startDate=' + params.startDate
 			+ '&endDate=' + params.endDate
 			;
@@ -654,42 +795,6 @@ function addMonths(date, months) {
     }
     return date;
 }
-
-
-//fetch all pages for event listings
-//- can also fetch a single page (up to 50) of locations
-//TODO: support multiple pages for non-events (e.g. newResponse.locations.pagination.pages)
-function fetch_all_pages(url, page=1, responses = []) {
-	console.log('fetch_all_pages: ', url, page);
-	
-	//TODO: check the cache first
-	//- make branches cache for 3 months
-	//- make events cache for 1 hour? 10 minutes?
-	//https://medium.com/javascript-dots/cache-api-in-javascript-644380391681
-	return fetch(`${url}&page=${page}`, { // Append the page number to the base URL
-		headers: {
-			'x-api-key': PRIVATE_API_KEY
-		}
-	})
-	.then(response => response.json())
-	.then(newResponse => {
-		responses.push(newResponse); // add new response to array
-		
-		//recurse if not the last page
-		if (typeof newResponse.events !== 'undefined'
-			&& page < newResponse.events.pagination.pages)
-		{ 
-			page++;
-			console.log("Recursing to page ", page);
-			//TODO: seems bad to recurse to a differently named function
-			return throttled_fetch(url, page, responses); //call throttled version
-		}
-		return responses;
-	});
-	
-		
-} //end function
-
 
 async function hide_image_if_ready() {
 	console.log('hide gif');
@@ -749,6 +854,137 @@ function throttle(func, wait, options) {
 };
 
 
+//const throttledRun = throttleAsync(fn, 1000);
+//throttledRun(1); // Will execute immediately.
+//throttledRun(2); // Will be delayed by 1 second.
+//throttledRun(3); // Will be delayed by 2 second.
+function throttleAsync(fn, wait) {
+  let lastRun = 0;
+
+  async function throttled(...args) {
+    const currentWait = lastRun + wait - Date.now();
+    const shouldRun = currentWait <= 0;
+
+    if (shouldRun) {
+      lastRun = Date.now();
+      
+      return await fn(...args);
+    } else {
+      return await new Promise(function(resolve) {
+        setTimeout(function() {
+          resolve(throttled(...args));
+        }, currentWait);
+      });
+    }
+  }
+
+  return throttled;
+}
+
+//TODO: consider using DOCX instead: https://docx.js.org
+//- try setting font to Euclid to make Brad's job easier
+
+function Export2Word(element, filename = ''){
+    var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>";
+    var postHtml = "</body></html>";
+    var html = preHtml+document.getElementById(element).innerHTML+postHtml;
+
+    var blob = new Blob(['\ufeff', html], {
+        type: 'application/msword'
+    });
+    
+    // Specify link url
+    var url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
+    
+    // Specify file name
+    filename = filename?filename:'document.doc';
+    
+    // Create download link element
+    var downloadLink = document.createElement("a");
+
+    document.body.appendChild(downloadLink);
+    
+    if(navigator.msSaveOrOpenBlob ){
+        navigator.msSaveOrOpenBlob(blob, filename);
+    }else{
+        // Create a link to the file
+        downloadLink.href = url;
+        
+        // Setting the file name
+        downloadLink.download = filename;
+        
+        //triggering the function
+        downloadLink.click();
+    }
+    
+    document.body.removeChild(downloadLink);
+}
+
+
+//fetch all pages for event listings
+//- can also fetch a single page (up to 50) of locations
+//TODO: support multiple pages for non-events (e.g. newResponse.locations.pagination.pages)
+function fetch_all_pages(url, page=1, responses = []) {
+	console.log('fetch_all_pages: ', url, page);
+	
+	//TODO: check the cache first
+	//- make branches cache for 3 months
+	//- make events cache for 1 hour? 10 minutes?
+	//https://medium.com/javascript-dots/cache-api-in-javascript-644380391681
+	return fetch(`${url}&page=${page}`, { // Append the page number to the base URL
+		headers: {
+			'x-api-key': PRIVATE_EVENTS_API_KEY
+		}
+	})
+	.then(response => response.json())
+	.then(newResponse => {
+		responses.push(newResponse); // add new response to array
+		
+		//recurse if not the last page
+		if (typeof newResponse.events !== 'undefined'
+			&& page < newResponse.events.pagination.pages)
+		{ 
+			page++;
+			console.log("Recursing to page ", page);
+			//TODO: seems bad to recurse to a differently named function
+			return throttled_fetch(url, page, responses); //call throttled version
+		}
+		return responses;
+	});
+	
+		
+} //end function
+
+
+//version 2: not working
+async function searchBookAndDisplayImage(bookTitle) {
+  //TODO: const apiUrl = `https://wm-submittable-server.onrender.com/bookcover/book-cover?title_id={bibId}`;
+
+  const encodedTitle = encodeURIComponent(bookTitle);
+  const apiUrl = `https://api.bibliocommons.com/v1/titles?library=kdl&search_type=custom&q=formatcode%3A(BK )%20%20anywhere%3A(${encodedTitle})&api_key=${PRIVATE_BIBLIOCORE_API_KEY}`;
+  const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
+
+  try {
+    const response = await fetch(corsProxyUrl + apiUrl);
+    const data = await response.json();
+
+    if (data.title && data.title.isbns && data.title.isbns.length > 0) {
+      const isbn = data.title.isbns[0];
+      const imageUrl = `https://secure.syndetics.com/index.aspx?isbn=${isbn}/LC.GIF`;
+
+      console.log(`Image displayed for ISBN: ${isbn}`);
+
+      return imageUrl;
+
+    } else {
+      console.log('No ISBN found for the given book title');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+
 
 //If user chooses a single branch
 //- sort by age group (age_groups_in_order[])
@@ -758,6 +994,7 @@ function sort_and_display(json_responses) {
 
 	let html = ``;
 	let event_blocks = new Array();
+	let calendar_list = new Array();
 
 	//collect data from each fetched page
 	json_responses.forEach(response_obj => {
@@ -767,7 +1004,7 @@ function sort_and_display(json_responses) {
 		events = response_obj.entities.events;
 		ev_audiences = response_obj.entities.eventAudiences;
 		//TODO: utilize other data, like programs and types
-		//programs = response_obj.entities.eventPrograms;
+		programs = response_obj.entities.eventPrograms;
 		types = response_obj.entities.eventTypes;
 		console.log("how many events in this set? ", event_ids.length);
 		
@@ -803,6 +1040,17 @@ function sort_and_display(json_responses) {
 			end_time = `${dt_end[6].value}:${dt_end[8].value} ${dt_end[10].value}`;
 
 			description = event.description;
+			//adjust links
+			description = description.replace(/<a href="[^"]*kdl-lab[^"]*"[^>]*>What is KDL Lab Experience?[^<]*<\/a>/, '');
+			//TODO: ECE 'Pre-register...'
+			description = description.replaceAll('&nbsp;', ' ');
+			description = description.replaceAll('<strong>', '');
+			description = description.replaceAll('</strong>', '');
+			description = description.replace(/<a href="[^"]*miregistry.org[^"]*"[^>]*>(<br>)?(<br>)?Pre-register[^<]*credit<\/a><a[^>]*>\.[\s]*<\/a>/, ' Register online.');
+			//TODO: KDL Author Talks | ...
+			description = description.replace(/<a href="[^"]*libraryc.org\/kdl[^"]*"[^>]*>Click here to register.<\/a>/, ' Register online.');
+			//TODO: IG Live | Book Talks
+			//TODO: Stump the Librarian Podcast
 
 
 			var is_bookclub = false;
@@ -810,26 +1058,36 @@ function sort_and_display(json_responses) {
 				if (event_types[typeId] == 'Book Discussion') is_bookclub = true;
 			});
 			
+			var is_bookmobile = false;
+			if (event.programId == program_ids['Bookmobile Visits']) is_bookmobile = true;
+			
 			//SPECIAL TREATMENT for book clubs
 			bookclub_title = '';
 			bookclub_author = '';
+			bookcover_url = '';
+			book_catalog_url = '';
 			if (is_bookclub) {
+				//TODO: grab data via bibId instead of messing with description
+				bibId = event.bibIds[0];
+				bookcover_url = `https://wm-submittable-server.onrender.com/bookcover/book-cover?title_id=${bibId}`;
+
 				//fix incomplete link
 				description = description.replace('href="/item/show/', 'href="https://kdl.bibliocommons.com/item/show/');
-				description = description.replaceAll('&nbsp;', ' ');
 				description = description.replaceAll('<em>', '');
 				description = description.replaceAll('</em>', '');
 				description = description.replaceAll('<i>', '');
 				description = description.replaceAll('</i>', '');
-				console.log(description);
+				description = description.replaceAll('<p>', '');
+				description = description.replaceAll('</p>', '');
+				description = description.replaceAll('<br>', '');
 				
 				//use regex to grab URL, title and author
 				matches = description.match(/<a [^>]*href="(.*)">(.*)<\/a> *by (.*)/);
 				if (matches) {
-					console.log(matches);
+					book_catalog_url = matches[0];
 					bookclub_title = matches[2];
 					bookclub_author = matches[3];
-					//find and remove ending period
+					// find and remove ending period
 					position_of_period = bookclub_author.lastIndexOf('.');
 					bookclub_author = bookclub_author.substring(0,position_of_period) + bookclub_author.substring(position_of_period+1);
 				} else {
@@ -845,11 +1103,14 @@ function sort_and_display(json_responses) {
 			nonbranch_location_name = '';
 			if (location_id) {
 				location_name = locations[location_id].name;
+				//output "Twp." instead of "Township"
+				location_name = location_name.replace('Township', 'Twp.');
 			} else {
 				location_name = ' Non-Branch Locations'; //start with a space so it sorts to the top
-				nonbranch_location_name = nonbranch_locations[nonbranch_id].name;
+				nonbranch_location_name = (nonbranch_locations[nonbranch_id] ? nonbranch_locations[nonbranch_id].name : '');
 				//look for "Online event" checkbox
 				if (nonbranch_location_name == 'Online event') {
+					location_name = 'Online';
 					//find the link in the description
 					let link = /<a[^>]+>.+?<\/a>/.exec(description);
 					nonbranch_location_name = 'Online';
@@ -864,8 +1125,18 @@ function sort_and_display(json_responses) {
 			title = event.title.trim();
 			
 			event_url = 'https://kdl.bibliocommons.com/events/' + event_id;
-			//NOTE: WHY ADD URL AND DATE?? IT'S FOR BRAD! Via Excel.
-			all_titles.add(title + ';' + event_url + ';' + month_excel + ' ' + day_num); //build list of all titles
+			time_str = `${start_time}`;
+			//build format for excel
+			//- include "Alto, Mon 10:00, Storytime"
+
+			//collect ages/audiences
+			ages_arr = [];
+			event.audienceIds.forEach(audience_id => {
+				ages_arr.push(ev_audiences[audience_id].name);
+			});
+			ages_str = ages_arr.sort(sort_age_groups).join(', ');
+			
+			all_titles.add(location_name + ', ' + days_of_week[day_of_week] + ' ' + time_str + ', ' + title + ';' + event_url + ';' + month_excel + ' ' + day_num + ';' + ages_str); //build list of all titles
 
 
 			//show if "Registration required"				
@@ -875,17 +1146,10 @@ function sort_and_display(json_responses) {
 			//TODO: utilize other data within each event:
 			//- locationDetails
 			//- audienceIds, typeIds, languageIds
-			//- bibIds (we could use them for book clubs)
+			//- bibIds (book clubs): event->bibIds[0]
 			//- staffNotes
 			//- featuredImageId
 
-			//collect ages/audiences
-			ages_arr = [];
-			event.audienceIds.forEach(audience_id => {
-				ages_arr.push(ev_audiences[audience_id].name);
-			});
-			ages_str = ages_arr.sort(sort_age_groups).join(', ');
-			
 			//choose one primary event type from the assigned list of types
 			event_type = event_types[event.typeIds[0]];
 			//TODO: loop through typeIds, grab first one that exists in event_types_in_order[]
@@ -893,15 +1157,7 @@ function sort_and_display(json_responses) {
 			
 
 			//FOR 'ALL_ADULT', group by event type first
-			if (filter_location_code === 'ALL_ADULT'
-				|| filter_location_code === 'ALL_ADULT_21'
-				|| filter_location_code === 'ALL_ADULT_55'
-				|| filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS'
-				|| filter_location_code === 'ALL_TEEN'
-				|| filter_location_code === 'ALL_YOUTH_NONSTORYTIMES'
-				|| filter_location_code === 'ALL_AGES'
-				|| filter_location_code === 'EVERYTHING'
-			) {
+			if (multibranch_display_choices.includes(filter_location_code)) {
 				//build the HTML output using template strings
 				
 				/***************
@@ -909,10 +1165,9 @@ function sort_and_display(json_responses) {
 				****************/
 				event_type = is_bookclub ? "Book Discussion " + location_name : title;
 				
-				time_str = `${start_time}`;
 				duration = (duration_hours === '1.0') ? ' One hour.' : ` ${duration_minutes} minutes.`;
 				if (duration_hours === '2.0') duration = ' Two hours.';
-				description = description.replace('</p>', duration + '</p>')
+				//description = description.replace('</p>', duration + '</p>')
 				
 				if (typeof event_blocks[event_type] === 'undefined') {
 					event_blocks[event_type] = new Array();
@@ -924,6 +1179,7 @@ function sort_and_display(json_responses) {
 					event_blocks[event_type][ages_str][title] = {
 						'event_type': event_type,
 						'is_bookclub': is_bookclub,
+						'bookcover_images': [`<img src="${bookcover_url}" alt="book cover for this book club" />`],
 						'location': location_name,
 						'nonbranch_location': nonbranch_location_name,
 						'ages_str': ages_str,
@@ -931,7 +1187,7 @@ function sort_and_display(json_responses) {
 						'description': description,
 						'reg_required_str': reg_required_str,
 						'cancelled': (is_cancelled ? '[CANCELLED]' : ''),
-						'dates': ['<h4>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</h4>'],
+						'dates': ['<div>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</div>'],
 						'dates_bookclub': [month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
 							+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
 							+ '<br>'],
@@ -939,16 +1195,21 @@ function sort_and_display(json_responses) {
 						'date_objects': [event_start_datetime]
 					}
 				} else {
-					event_blocks[event_type][ages_str][title].dates.push('<h4>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</h4>'),
+					event_blocks[event_type][ages_str][title].dates.push('<div>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str	+ ' &mdash; ' + location_name + '</div>');
 					event_blocks[event_type][ages_str][title].dates_bookclub.push(month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
 							+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
-						+ '<br>'),
+						+ '<br>');
+					event_blocks[event_type][ages_str][title].bookcover_images.push(`<img src="${bookcover_url}" alt="book cover for this book club" />`);
 					event_blocks[event_type][ages_str][title].date_objects.push(event_start_datetime);
 				}
 
 			} else {
 				//FOR SINGLE BRANCH, group by age group first
 				
+				if (is_bookmobile) {
+					title = title.replace("Bookmobile Visit | ", "");
+				}
+
 				//if exactly 1 hour long, simplify time display
 				time_str = (duration_hours === '1.0') ? `${start_time}` : `${start_time} to ${end_time}`;
 				
@@ -964,22 +1225,42 @@ function sort_and_display(json_responses) {
 						'location': location_name,
 						'nonbranch_location': nonbranch_location_name,
 						'is_bookclub': is_bookclub,
+						'is_bookmobile': is_bookmobile,
+						'bookcover_images': [`<img src="${bookcover_url}" alt="book cover for this book club" />`],
+						'time_bookclub': day_of_week + 's at ' + time_str + '<br>',
+						'dates_bookmobile': ['<div>' + month + ' ' + day_num + '</div>'],
+						'time_bookmobile': day_of_week + 's at ' + time_str + '<br>',
 						'ages_str': ages_str,
 						'title': title,
 						'description': description,
 						'reg_required_str': reg_required_str,
 						'cancelled': (is_cancelled ? '[CANCELLED]' : ''),
-						'dates': ['<div>' + day_of_week + ', ' + month + ' ' + day_num + ', ' + time_str + '</div>'],
+						'dates': ['<div>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str + '</div>'],
+						'dates_bookclub': [month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
+							+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
+							+ '<br>'],
 						'date_objects': [event_start_datetime]
 					}
 				} else {
 					if (event_blocks[location_name][ages_str][title].description !== description) {
 						event_blocks[location_name][ages_str][title].description += '<div>' + month + ' ' + day_num + ': ' + description + '</div>';
 					}
-					event_blocks[location_name][ages_str][title].dates.push('<div>' + day_of_week + ', ' + month + ' ' + day_num + ', ' + time_str + '</div>');
+					event_blocks[location_name][ages_str][title].dates.push('<div>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ', ' + time_str + '</div>');
+					event_blocks[location_name][ages_str][title].bookcover_images.push(`<img src="${bookcover_url}" alt="book cover for this book club" />`);
+					event_blocks[location_name][ages_str][title].dates_bookclub.push(month + ' ' + day_num + ', <i>' + bookclub_title + '</i>'
+						+ (typeof(bookclub_author)!== undefined && bookclub_author ? ' by ' + bookclub_author : '')
+						+ '<br>');
+					event_blocks[location_name][ages_str][title].dates_bookmobile.push(month + ' ' + day_num + '<br>');
 					event_blocks[location_name][ages_str][title].date_objects.push(event_start_datetime);
 				}
-			} //end if (filter_location_code === 'ALL_ADULT')
+
+				//QUICK HACK: Calendar List
+				if (typeof calendar_list[event_start_datetime] === 'undefined') {
+					calendar_list[event_start_datetime] = new Array();
+				}
+				calendar_list[event_start_datetime].push('<div>' + days_of_week[day_of_week] + '., ' + month + ' ' + day_num + ' - ' + ages_str + ' - ' + title + ' @ ' + time_str);
+
+			} //end if (filter_location_code === 'ALL_ADULT_NONBOOKDISCUSSIONS')
 			
 			
 		}); //end foreach event_ids
@@ -1006,15 +1287,7 @@ function sort_and_display(json_responses) {
 	//***TODO: SORT BY TITLE INSTEAD, don't display event type
 	
 	
-	if (filter_location_code === 'ALL_ADULT'
-		|| filter_location_code === 'ALL_ADULT_BOOKDISCUSSIONS'
-		|| filter_location_code === 'ALL_ADULT_21'
-		|| filter_location_code === 'ALL_ADULT_55'
-		|| filter_location_code === 'ALL_TEEN'
-		|| filter_location_code === 'ALL_YOUTH_NONSTORYTIMES'
-		|| filter_location_code === 'ALL_AGES'
-		|| filter_location_code === 'EVERYTHING'
-	) {
+	if (multibranch_display_choices.includes(filter_location_code)) {
 
 		//loop through multi-layer array, building the output string
 		//- locations come first
@@ -1076,22 +1349,25 @@ function sort_and_display(json_responses) {
 						if (!event.cancelled) {
 							html += `
 								<h2>${event.location}</h2>
-								<p>
-								` + `<strong>${event.title}</strong><br>
-								` + `${event.time_bookclub}<br>
-								` + event.dates_bookclub.join('') + `<br>
-								` + (event.location_details ? `(Details: ${event.location_details})` : '') + `${event.reg_required_str}<br>
+								<p style="font-size:13px;">
+								` + `<p style="font-size:16px; font-weight:bold">${event.title}</p>
+								` + `<p>${event.time_bookclub}</p>
+								<p>` + event.dates_bookclub.join('') + `</p>
+								` + (event.location_details ? `(Details: ${event.location_details})` : '') + `${event.reg_required_str}
 								</p>
+								` + (hide_bookcovers==='true' ? '' : event.bookcover_images) + `
 							`;
 						}
 					} else {
 						html += `
-								${event.cancelled} <h2>${event.title}</h2>
-							` + (hide_descriptions==='true' ? '' : `<p>${event.description}</p>`) + `
-							` + (date_range_str!='' ? `<h3>${date_range_str}</h3>` : '') + `
-							` + event.dates.join('') + `
+							<p style="font-size:13px;">
+								${event.cancelled} <span style="font-size:16px; font-weight:bold">${event.title}</span>
+							` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
+							` + (hide_dates==='true' ? '' : event.dates.join('') ) + `
 							` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
-								<p>${event.reg_required_str}</p>
+							` + (hide_dates==='true' ? '' : `<p>${event.reg_required_str}</p>`) + `
+							</p>
+							<br>
 						`;
 					}
 				}
@@ -1160,17 +1436,46 @@ function sort_and_display(json_responses) {
 						date_range_str = `${day_of_week}s, ${first_month} ${first_day_num} - ${month} ${day_num}, ${start_time}`;
 					}
 					
-					html += `
-						<div style="margin-top:1em; font-size:10px;">
-							<div>${event.cancelled} <span style="font-size:12px; font-weight:bold">${event.title}</span></div>
-						` + (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') + `
-						` + event.dates.join('') + `
-						` + (event.nonbranch_location ? `Location: ${event.nonbranch_location}` : '') + `
-						` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
-						` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
-							<div>${event.reg_required_str}</div>
-						</div>
-					`;
+					if (event.is_bookclub) {
+						if (!event.cancelled) {
+							html += `
+								<h2>${event.location}</h2>
+								<p style="font-size:13px;">
+								` + `<p style="font-size:16px; font-weight:bold">${event.title}</p>
+								` + `<p>${event.time_bookclub}</p>
+								<p>` + event.dates_bookclub.join('') + `</p>
+								` + (event.location_details ? `(Details: ${event.location_details})` : '') + `${event.reg_required_str}
+								</p>
+								` + (hide_bookcovers==='true' ? '' : event.bookcover_images) + `
+							`;
+						}
+					} else if (event.is_bookmobile) {
+						html += `
+							<p style="font-size:13px;">
+								${event.cancelled} <span style="font-size:16px; font-weight:bold">${event.title}</span>
+							` + (event.nonbranch_location ? `<p>Location: ${event.nonbranch_location}</p>` : '') + `
+							` + `<p>${event.time_bookmobile}</p>
+							` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
+							` + (hide_dates==='true' ? '' : event.dates_bookmobile.join('') ) + `
+							` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
+							` + (hide_dates==='true' ? '' : `<p>${event.reg_required_str}</p>`) + `
+							</p>
+							<br>
+						`;
+					} else {
+						html += `
+							<p style="font-size:13px;">
+								${event.cancelled} <span style="font-size:16px; font-weight:bold">${event.title}</span>
+							` + (hide_dates==='true' ? '' : (date_range_str!='' ? `<div><b>${date_range_str}</b></div>` : '') ) + `
+							` + (hide_dates==='true' ? '' : event.dates.join('') ) + `
+							` + (event.nonbranch_location ? `Location: ${event.nonbranch_location}` : '') + `
+							` + (event.location_details ? `(Details: ${event.location_details})` : '') + `
+							` + (hide_descriptions==='true' ? '' : `<div>${event.description}</div>`) + `
+								<div>${event.reg_required_str}</div>
+							</p>
+							<br>
+						`;
+					}
 				}
 			}
 		}
@@ -1180,12 +1485,22 @@ function sort_and_display(json_responses) {
 
 
 	//display event output
-	document.getElementById(div_id).insertAdjacentHTML('beforeend', html);
+	document.getElementById(div_id).insertAdjacentHTML('beforeend', 
+		'<h1>' + filter_location_name + '</h1>'
+		+ html
+	);
+
+	//print Calendar List
+	html_calendar_list = '<h3>Calendar List</h3><p style="font-size:13px;">';
+	for (const [cal_item_key, cal_item_name] of Object.entries(calendar_list)) {
+		html_calendar_list += '<div>' + cal_item_name + '</div>';
+	}
+	document.getElementById('events_excel').insertAdjacentHTML('beforeend', html_calendar_list);
 
 	//print sorted list of titles
 	all_events = '<h3>All Events in This Timeframe</h3><div>(Paste into Excel)</div><p>' + [...all_titles].sort().join('<br>');
 
-	document.getElementById(div_id).insertAdjacentHTML('beforeend', all_events);
+	document.getElementById('events_excel').insertAdjacentHTML('beforeend', all_events);
 	branches_done++;
 
 }
