@@ -85,7 +85,7 @@ TODO
 const LIBRARY_ID = 'kdl';
 
 //YOUR PRIVATE EVENTS API KEY
-const PRIVATE_EVENTS_API_KEY = '[.....put your BiblioEvents API key here.....]';
+const PRIVATE_EVENTS_API_KEY = process.env.PRIVATE_EVENTS_API_KEY; //reads from environment variables, or you can replace this with a string like 'xyz123xyz123'
 
 
 //your age groups, listed in the order you want them displayed
